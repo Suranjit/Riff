@@ -25,13 +25,41 @@ export class JoinLinkError extends Error {
 }
 
 /** Compose a join link from its parts. */
-export function buildJoinLink(_link: JoinLink): string {
-  // TODO(#15): implement.
-  throw new Error('buildJoinLink is not implemented yet (#15)');
+export function buildJoinLink(link: JoinLink): string {
+  const params = new URLSearchParams();
+  params.set('c', link.joinCode);
+  if (link.fingerprint) params.set('fp', link.fingerprint);
+  if (link.participantKey) params.set('me', link.participantKey);
+  if (link.name) params.set('name', link.name);
+  return `${link.baseUrl}/room/${link.sessionId}#${params.toString()}`;
 }
 
 /** Parse a join link. @throws {JoinLinkError} on a malformed link. */
-export function parseJoinLink(_raw: string): JoinLink {
-  // TODO(#15): implement.
-  throw new Error('parseJoinLink is not implemented yet (#15)');
+export function parseJoinLink(raw: string): JoinLink {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new JoinLinkError('Join link is not a valid URL');
+  }
+
+  const match = url.pathname.match(/^\/room\/([^/]+)$/);
+  if (!match?.[1]) {
+    throw new JoinLinkError('Join link must point at a /room/<sessionId> path');
+  }
+
+  const params = new URLSearchParams(url.hash.replace(/^#/, ''));
+  const joinCode = params.get('c');
+  if (!joinCode) {
+    throw new JoinLinkError('Join link is missing the join code (#c=…)');
+  }
+
+  return {
+    baseUrl: url.origin,
+    sessionId: match[1],
+    joinCode,
+    ...(params.get('fp') ? { fingerprint: params.get('fp')! } : {}),
+    ...(params.get('me') ? { participantKey: params.get('me')! } : {}),
+    ...(params.get('name') ? { name: params.get('name')! } : {}),
+  };
 }

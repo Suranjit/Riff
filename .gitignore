@@ -7,6 +7,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# Bundled board copied into the publishable package at build time
+packages/cli/board/
+*.tgz
+
 # Test / coverage
 coverage/
 .vitest/

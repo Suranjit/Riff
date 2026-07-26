@@ -13,7 +13,7 @@ import {
 } from '@riff/shared';
 import { DEFAULT_LIMITS, type RiffLimits } from './config.js';
 import { signTicket, verifyTicket, TicketError, type TicketClaims } from './crypto/ticket.js';
-import { constantTimeEquals } from './crypto/credentials.js';
+import { constantTimeEquals, fingerprintCert } from './crypto/credentials.js';
 import { OwnershipError, RoomFullError, SessionStore } from './sessionStore.js';
 import { TokenBucket } from './rateLimiter.js';
 
@@ -148,6 +148,14 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
       }
     }
   }
+
+  // --- HTTPS: public session metadata --------------------------------------
+  // The fingerprint is not a secret (every TLS client sees the certificate);
+  // exposing it lets the board compose the one-command Claude Code setup.
+  const certFingerprint = fingerprintCert(opts.tls.cert);
+  app.get('/meta', async (_request: FastifyRequest, reply: FastifyReply) => {
+    return reply.code(200).send({ fingerprintSha256: certFingerprint });
+  });
 
   // --- HTTPS: authenticate and mint a ticket -------------------------------
   app.post('/rooms/:sessionId/auth', async (request: FastifyRequest, reply: FastifyReply) => {

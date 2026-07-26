@@ -1,7 +1,9 @@
 import type { SessionFileConfig } from './sessionFile.js';
 
 /** The connection options the MCP subcommands need. */
-export type ResolvedSession = SessionFileConfig;
+export type ResolvedSession = Omit<SessionFileConfig, 'participantKey'> & {
+  participantKey?: string;
+};
 
 /**
  * Resolve session options for `riff mcp`: RIFF_* environment variables win,
@@ -9,9 +11,23 @@ export type ResolvedSession = SessionFileConfig;
  * complete configuration.
  */
 export function resolveSessionOptions(
-  _env: Record<string, string | undefined>,
-  _file: SessionFileConfig | undefined,
+  env: Record<string, string | undefined>,
+  file: SessionFileConfig | undefined,
 ): ResolvedSession | undefined {
-  // TODO(#15): implement.
-  throw new Error('resolveSessionOptions is not implemented yet (#15)');
+  const baseUrl = env.RIFF_URL ?? file?.baseUrl;
+  const sessionId = env.RIFF_SESSION ?? file?.sessionId;
+  const joinCode = env.RIFF_JOIN_CODE ?? file?.joinCode;
+  const name = env.RIFF_NAME ?? file?.name;
+  if (!baseUrl || !sessionId || !joinCode || !name) return undefined;
+
+  const fingerprint = env.RIFF_FINGERPRINT ?? file?.fingerprint;
+  const participantKey = env.RIFF_PARTICIPANT_KEY ?? file?.participantKey;
+  return {
+    baseUrl,
+    sessionId,
+    joinCode,
+    name,
+    ...(fingerprint ? { fingerprint } : {}),
+    ...(participantKey ? { participantKey } : {}),
+  };
 }

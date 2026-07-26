@@ -3,6 +3,8 @@
  * `riff mcp | hook | autopush` commands. Written by `riff join`, replaced on
  * every new session.
  */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 export type SessionFileConfig = {
   baseUrl: string;
@@ -14,19 +16,23 @@ export type SessionFileConfig = {
 };
 
 /** The session file path under a home directory. */
-export function sessionFilePath(_homeDir: string): string {
-  // TODO(#15): implement.
-  throw new Error('sessionFilePath is not implemented yet (#15)');
+export function sessionFilePath(homeDir: string): string {
+  return join(homeDir, '.riff', 'session.json');
 }
 
 /** Write (replace) the session config. */
-export function writeSessionFile(_path: string, _config: SessionFileConfig): void {
-  // TODO(#15): implement.
-  throw new Error('writeSessionFile is not implemented yet (#15)');
+export function writeSessionFile(path: string, config: SessionFileConfig): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }
 
 /** Read the session config; undefined when missing or unreadable. */
-export function readSessionFile(_path: string): SessionFileConfig | undefined {
-  // TODO(#15): implement.
-  throw new Error('readSessionFile is not implemented yet (#15)');
+export function readSessionFile(path: string): SessionFileConfig | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as SessionFileConfig;
+    return typeof parsed === 'object' && parsed !== null ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }

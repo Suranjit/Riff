@@ -1,3 +1,5 @@
+import { buildJoinLink } from '@riff/shared';
+
 export type ConnectCommandInput = {
   /** Board origin, e.g. `https://192.168.1.20:4747`. */
   origin: string;
@@ -10,7 +12,14 @@ export type ConnectCommandInput = {
 };
 
 /** The one-command Claude Code setup a participant copies from the board. */
-export function buildConnectCommand(_input: ConnectCommandInput): string {
-  // TODO(#15): implement.
-  throw new Error('buildConnectCommand is not implemented yet (#15)');
+export function buildConnectCommand(input: ConnectCommandInput): string {
+  const link = buildJoinLink({
+    baseUrl: input.origin,
+    sessionId: input.sessionId,
+    joinCode: input.joinCode,
+    fingerprint: input.fingerprint,
+    participantKey: input.participantKey,
+    name: input.name,
+  });
+  return `npx riffboard join "${link}"`;
 }

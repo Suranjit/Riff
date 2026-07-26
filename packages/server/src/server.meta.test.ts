@@ -18,8 +18,12 @@ describe('GET /meta', () => {
   });
 
   it('is stable across calls', async () => {
-    const a = JSON.parse((await httpsGet(`${h.origin}/meta`)).body) as { fingerprintSha256: string };
-    const b = JSON.parse((await httpsGet(`${h.origin}/meta`)).body) as { fingerprintSha256: string };
+    const a = JSON.parse((await httpsGet(`${h.origin}/meta`)).body) as {
+      fingerprintSha256: string;
+    };
+    const b = JSON.parse((await httpsGet(`${h.origin}/meta`)).body) as {
+      fingerprintSha256: string;
+    };
     expect(a.fingerprintSha256).toBe(b.fingerprintSha256);
   });
 });

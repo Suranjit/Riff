@@ -6,7 +6,9 @@ import { initialBoardState, type BoardState } from './state/boardReducer.js';
 import { resolveParticipantKey } from './net/participantKey.js';
 import { Board } from './components/Board.js';
 import { ConnectionPill } from './components/ConnectionPill.js';
+import { ConnectPanel } from './components/ConnectPanel.js';
 import { JoinForm } from './components/JoinForm.js';
+import { buildConnectCommand } from './lib/connectCommand.js';
 
 /** Read the session id from a `/room/:id` path. */
 function sessionIdFromLocation(): string {
@@ -30,6 +32,8 @@ export function App(): JSX.Element {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [riffNotice, setRiffNotice] = useState<string>();
+  const [identity, setIdentity] = useState<{ name: string; code: string }>();
+  const [fingerprint, setFingerprint] = useState<string>();
 
   useEffect(() => {
     if (!client) return;
@@ -43,6 +47,22 @@ export function App(): JSX.Element {
     };
   }, [client]);
 
+  // Fetch the host cert fingerprint once connected, so we can compose the
+  // one-command Claude Code setup for this participant.
+  useEffect(() => {
+    if (!client) return;
+    let live = true;
+    fetch(`${baseUrl}/meta`)
+      .then((r) => r.json() as Promise<{ fingerprintSha256: string }>)
+      .then((meta) => {
+        if (live) setFingerprint(meta.fingerprintSha256);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [client, baseUrl]);
+
   async function handleJoin({ name, code }: { name: string; code: string }): Promise<void> {
     setBusy(true);
     setError(undefined);
@@ -55,6 +75,7 @@ export function App(): JSX.Element {
         participantKey,
       });
       const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/rooms/${sessionId}?ticket=${encodeURIComponent(ticket)}`;
+      setIdentity({ name, code });
       setClient(new RiffClient({ url: wsUrl, self: { participantId } }));
     } catch (err) {
       setError(err instanceof AuthError ? err.message : 'Could not join the session.');
@@ -73,6 +94,18 @@ export function App(): JSX.Element {
     return <JoinForm onSubmit={handleJoin} error={error} busy={busy} />;
   }
 
+  const connectCommand =
+    identity && fingerprint
+      ? buildConnectCommand({
+          origin: baseUrl,
+          sessionId,
+          joinCode: identity.code,
+          fingerprint,
+          participantKey,
+          name: identity.name,
+        })
+      : undefined;
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-stone-200/70 bg-paper/80 backdrop-blur">
@@ -87,7 +120,10 @@ export function App(): JSX.Element {
               </span>
             ) : null}
           </div>
-          <ConnectionPill state={connection} />
+          <div className="flex items-center gap-3">
+            {connectCommand ? <ConnectPanel command={connectCommand} /> : null}
+            <ConnectionPill state={connection} />
+          </div>
         </div>
       </header>
 
