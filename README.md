@@ -103,6 +103,15 @@ pnpm test        # run the full test suite
 pnpm typecheck   # type-check every package
 ```
 
+**Run it locally** (the board is real; publishing capsules from Claude Code is
+still in progress — use `--demo` to seed sample capsules):
+
+```bash
+pnpm build                                   # build the board assets
+pnpm --filter @riff/cli start --demo         # start a host + serve the board
+# → open the printed https URL, accept the cert, enter the join code
+```
+
 ### Once released (planned)
 
 ```bash

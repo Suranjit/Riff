@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
 import fastifyHelmet from '@fastify/helmet';
+import fastifyStatic from '@fastify/static';
 import type { WebSocket } from 'ws';
 import {
   parseEnvelope,
@@ -37,6 +38,11 @@ export type RiffServerOptions = {
   ticketTtlMs?: number;
   /** Interface to bind (default `0.0.0.0` for LAN). */
   host?: string;
+  /**
+   * Directory of built board assets to serve. When set, the server serves these
+   * files and falls back to `index.html` for non-API GET routes (SPA routing).
+   */
+  staticDir?: string;
   /** Injectable clock (unix ms). Defaults to `Date.now`. */
   now?: () => number;
 };
@@ -75,10 +81,24 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
   const claimsByRequest = new WeakMap<FastifyRequest, TicketClaims>();
 
   const app = Fastify({ https: { key: opts.tls.key, cert: opts.tls.cert } });
-  await app.register(fastifyHelmet);
+  // When serving the board we relax CSP so the bundled SPA loads; the API-only
+  // mode keeps helmet's stricter defaults.
+  await app.register(fastifyHelmet, opts.staticDir ? { contentSecurityPolicy: false } : {});
   await app.register(fastifyWebsocket, {
     options: { maxPayload: limits.maxFramePayloadBytes },
   });
+
+  if (opts.staticDir) {
+    await app.register(fastifyStatic, { root: opts.staticDir, wildcard: false });
+    // SPA fallback: any unmatched GET serves index.html so client-side routes
+    // like /room/:id load the board. Non-GET unknown routes are a real 404.
+    app.setNotFoundHandler((request, reply) => {
+      if (request.method === 'GET') {
+        return reply.sendFile('index.html');
+      }
+      return reply.code(404).send({ error: 'not_found' });
+    });
+  }
 
   function originAllowed(request: FastifyRequest): boolean {
     const origin = request.headers.origin;

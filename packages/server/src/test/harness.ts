@@ -102,6 +102,32 @@ export function httpsPostJson(
   });
 }
 
+export type TextResponse = { status: number; body: string };
+
+/** GET a URL over HTTPS, trusting the self-signed cert; returns the raw body. */
+export function httpsGet(url: string, headers: Record<string, string> = {}): Promise<TextResponse> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        port: u.port,
+        path: u.pathname + u.search,
+        method: 'GET',
+        rejectUnauthorized: false,
+        headers,
+      },
+      (res) => {
+        let chunks = '';
+        res.on('data', (c) => (chunks += c));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: chunks }));
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 /** Open a WSS client that trusts the self-signed cert, with an Origin header. */
 export function openSocket(url: string, origin = 'https://localhost'): WebSocket {
   return new WebSocket(url, { rejectUnauthorized: false, headers: { origin } });
