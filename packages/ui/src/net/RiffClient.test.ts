@@ -25,11 +25,14 @@ class FakeSocket implements WebSocketLike {
   }
 }
 
+const SELF_ID = '22222222-2222-4222-8222-222222222222';
+const TARGET_CAPSULE_ID = '44444444-4444-4444-8444-444444444444';
+
 function makeClient() {
   let socket!: FakeSocket;
   const client = new RiffClient({
     url: 'wss://host:4747/rooms/x',
-    self: { participantId: 'me' },
+    self: { participantId: SELF_ID },
     socketFactory: () => {
       socket = new FakeSocket();
       return socket;
@@ -59,11 +62,11 @@ describe('RiffClient', () => {
 
   it('sends a riff:request with the viewer as origin on riff()', () => {
     const { client, socket } = makeClient();
-    client.riff('target-capsule-id');
+    client.riff(TARGET_CAPSULE_ID);
     expect(socket.lastMessage()).toEqual({
       type: 'riff:request',
-      fromParticipantId: 'me',
-      targetCapsuleId: 'target-capsule-id',
+      fromParticipantId: SELF_ID,
+      targetCapsuleId: TARGET_CAPSULE_ID,
     });
   });
 

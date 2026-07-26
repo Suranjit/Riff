@@ -3,11 +3,12 @@ import { authenticate, AuthError } from './authenticate.js';
 import { SESSION } from '../test/fixtures.js';
 
 function fakeFetch(status: number, body: unknown): typeof fetch {
-  return vi.fn(async () =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { 'content-type': 'application/json' },
-    }),
+  return vi.fn(
+    async () =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
   ) as unknown as typeof fetch;
 }
 

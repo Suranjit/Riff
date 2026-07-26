@@ -28,7 +28,25 @@ export type AuthenticateOptions = {
 };
 
 /** Authenticate against the host and obtain a session ticket. */
-export async function authenticate(_opts: AuthenticateOptions): Promise<AuthResult> {
-  // TODO(#3): implement.
-  throw new Error('authenticate is not implemented yet (#3)');
+export async function authenticate(opts: AuthenticateOptions): Promise<AuthResult> {
+  const doFetch = opts.fetch ?? globalThis.fetch;
+  const url = `${opts.baseUrl}/rooms/${opts.sessionId}/auth`;
+  const res = await doFetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ credential: opts.credential, name: opts.name }),
+  });
+
+  if (!res.ok) {
+    const message =
+      res.status === 401
+        ? 'Check your join code.'
+        : res.status === 429
+          ? 'Too many attempts — wait a moment and try again.'
+          : 'Could not join the session.';
+    throw new AuthError(res.status, message);
+  }
+
+  const body = (await res.json()) as AuthResult;
+  return { ticket: body.ticket, participantId: body.participantId, role: body.role };
 }

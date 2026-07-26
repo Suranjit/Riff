@@ -1,5 +1,5 @@
-import type { ContextCapsule } from '@riff/shared';
-import { initialBoardState, type BoardState } from '../state/boardReducer.js';
+import { parseEnvelope, serializeEnvelope, type ContextCapsule } from '@riff/shared';
+import { boardReducer, initialBoardState, type BoardState } from '../state/boardReducer.js';
 
 export type ConnectionState = 'connecting' | 'open' | 'closed' | 'error';
 
@@ -28,32 +28,75 @@ export type RiffClientOptions = {
 export class RiffClient {
   state: BoardState = initialBoardState;
 
-  constructor(_opts: RiffClientOptions) {
-    // TODO(#3): implement.
-    throw new Error('RiffClient is not implemented yet (#3)');
+  private readonly socket: WebSocketLike;
+  private readonly self: { participantId: string };
+  private readonly stateListeners = new Set<(state: BoardState) => void>();
+  private readonly connectionListeners = new Set<(state: ConnectionState) => void>();
+  private connection: ConnectionState = 'connecting';
+
+  constructor(opts: RiffClientOptions) {
+    this.self = opts.self;
+    this.state = { ...initialBoardState, self: opts.self };
+    const factory = opts.socketFactory ?? ((url) => new WebSocket(url) as WebSocketLike);
+    this.socket = factory(opts.url);
+
+    this.socket.onopen = () => this.setConnection('open');
+    this.socket.onclose = () => this.setConnection('closed');
+    this.socket.onerror = () => this.setConnection('error');
+    this.socket.onmessage = (event) => this.handleData(event.data);
+  }
+
+  private handleData(data: unknown): void {
+    if (typeof data !== 'string') return;
+    let msg;
+    try {
+      msg = parseEnvelope(data).msg;
+    } catch {
+      return; // ignore malformed frames
+    }
+    this.state = boardReducer(this.state, msg);
+    for (const listener of this.stateListeners) listener(this.state);
+  }
+
+  private setConnection(next: ConnectionState): void {
+    this.connection = next;
+    for (const listener of this.connectionListeners) listener(next);
+  }
+
+  /** The current connection state. */
+  get connectionState(): ConnectionState {
+    return this.connection;
   }
 
   /** Subscribe to board-state changes; returns an unsubscribe function. */
-  subscribe(_listener: (state: BoardState) => void): () => void {
-    throw new Error('RiffClient.subscribe is not implemented yet (#3)');
+  subscribe(listener: (state: BoardState) => void): () => void {
+    this.stateListeners.add(listener);
+    return () => this.stateListeners.delete(listener);
   }
 
   /** Subscribe to connection-state changes; returns an unsubscribe function. */
-  onConnection(_listener: (state: ConnectionState) => void): () => void {
-    throw new Error('RiffClient.onConnection is not implemented yet (#3)');
+  onConnection(listener: (state: ConnectionState) => void): () => void {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
   }
 
   /** Publish (or update) the viewer's own capsule. */
-  publish(_capsule: ContextCapsule): void {
-    throw new Error('RiffClient.publish is not implemented yet (#3)');
+  publish(capsule: ContextCapsule): void {
+    this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule }));
   }
 
   /** Request to riff on another participant's capsule. */
-  riff(_targetCapsuleId: string): void {
-    throw new Error('RiffClient.riff is not implemented yet (#3)');
+  riff(targetCapsuleId: string): void {
+    this.socket.send(
+      serializeEnvelope({
+        type: 'riff:request',
+        fromParticipantId: this.self.participantId,
+        targetCapsuleId,
+      }),
+    );
   }
 
   close(): void {
-    throw new Error('RiffClient.close is not implemented yet (#3)');
+    this.socket.close();
   }
 }
