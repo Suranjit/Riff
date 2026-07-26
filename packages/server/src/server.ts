@@ -77,6 +77,9 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
   const connections = new Map<string, Set<Connection>>();
   // Per-IP auth throttle buckets.
   const authBuckets = new Map<string, TokenBucket>();
+  // sessionId -> (participantKey -> stable participantId), so a person's browser
+  // and Claude Code resolve to one identity across devices.
+  const identityByKey = new Map<string, Map<string, string>>();
   // Verified ticket claims, carried from the upgrade hook to the WS handler.
   const claimsByRequest = new WeakMap<FastifyRequest, TicketClaims>();
 
@@ -105,6 +108,30 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     if (origin === undefined) return true; // non-browser client
     const allowed = opts.allowedOrigins ?? [`https://${request.headers.host ?? ''}`];
     return allowed.includes(origin);
+  }
+
+  function resolveParticipantId(sessionId: string, participantKey?: string): string {
+    if (participantKey === undefined) return randomUUID();
+    let keys = identityByKey.get(sessionId);
+    if (!keys) {
+      keys = new Map();
+      identityByKey.set(sessionId, keys);
+    }
+    let id = keys.get(participantKey);
+    if (id === undefined) {
+      id = randomUUID();
+      keys.set(participantKey, id);
+    }
+    return id;
+  }
+
+  /** Number of open sockets in a room sharing a given participant id. */
+  function socketCountFor(sessionId: string, participantId: string): number {
+    const room = connections.get(sessionId);
+    if (!room) return 0;
+    let count = 0;
+    for (const conn of room) if (conn.participantId === participantId) count++;
+    return count;
   }
 
   function send(socket: WebSocket, msg: RiffMessage): void {
@@ -138,7 +165,11 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
       return reply.code(429).send({ error: 'too_many_attempts' });
     }
 
-    const body = (request.body ?? {}) as { credential?: unknown; name?: unknown };
+    const body = (request.body ?? {}) as {
+      credential?: unknown;
+      name?: unknown;
+      participantKey?: unknown;
+    };
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (name.length < 1 || name.length > 60) {
       return reply.code(400).send({ error: 'invalid_name' });
@@ -153,7 +184,11 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     }
 
     const { sessionId } = request.params as { sessionId: string };
-    const participantId = randomUUID();
+    // A participantKey maps to a stable id so the same person is one participant
+    // across devices; without a key each auth is a fresh identity.
+    const participantKey =
+      typeof body.participantKey === 'string' ? body.participantKey : undefined;
+    const participantId = resolveParticipantId(sessionId, participantKey);
     const ticket = signTicket(
       { sid: sessionId, pid: participantId, role, name, exp: now() + limits.ticketTtlMs },
       opts.signingSecret,
@@ -202,6 +237,9 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
         joinedAt: now(),
       };
 
+      // A person may hold several sockets (browser + Claude Code). Only the
+      // first socket for an identity joins presence; capacity counts identities.
+      const isFirstSocket = socketCountFor(sessionId, participant.id) === 0;
       try {
         store.join(sessionId, participant);
       } catch (err) {
@@ -221,9 +259,11 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
       }
       room.add(conn);
 
-      // Snapshot to the newcomer, then announce them to everyone else.
+      // Snapshot to the newcomer; announce presence only on the first socket.
       send(socket, { type: 'session:snapshot', ...store.snapshot(sessionId) });
-      broadcast(sessionId, { type: 'participant:joined', participant }, socket);
+      if (isFirstSocket) {
+        broadcast(sessionId, { type: 'participant:joined', participant }, socket);
+      }
 
       const msgBucket = new TokenBucket(limits.wsMessages.capacity, limits.wsMessages.refillPerMs);
 
@@ -249,9 +289,12 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
 
       socket.on('close', () => {
         room?.delete(conn);
+        // The participant leaves only when their last socket closes.
+        if (socketCountFor(sessionId, participant.id) === 0) {
+          store.leave(sessionId, participant.id);
+          broadcast(sessionId, { type: 'participant:left', participantId: participant.id });
+        }
         if (room && room.size === 0) connections.delete(sessionId);
-        store.leave(sessionId, participant.id);
-        broadcast(sessionId, { type: 'participant:left', participantId: participant.id });
       });
 
       function handleMessage(msg: RiffMessage): void {

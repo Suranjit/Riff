@@ -5,6 +5,7 @@ import { RiffClient } from './net/RiffClient.js';
 import { initialBoardState, type BoardState } from './state/boardReducer.js';
 import { Board } from './components/Board.js';
 import { JoinForm } from './components/JoinForm.js';
+import { resolveParticipantKey } from './net/participantKey.js';
 
 /** Read the session id from a `/room/:id` path. */
 function sessionIdFromLocation(): string {
@@ -14,6 +15,12 @@ function sessionIdFromLocation(): string {
 
 export function App(): JSX.Element {
   const sessionId = useMemo(sessionIdFromLocation, []);
+  // One identity across this person's devices: the `?me=` key (surfaced by the
+  // MCP plugin) links a browser to a Claude Code session; otherwise generate one.
+  const participantKey = useMemo(
+    () => resolveParticipantKey(window.location.search, () => crypto.randomUUID()),
+    [],
+  );
   const baseUrl = window.location.origin;
 
   const [client, setClient] = useState<RiffClient | null>(null);
@@ -36,6 +43,7 @@ export function App(): JSX.Element {
         sessionId,
         credential: code,
         name,
+        participantKey,
       });
       const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/rooms/${sessionId}?ticket=${encodeURIComponent(ticket)}`;
       setClient(new RiffClient({ url: wsUrl, self: { participantId } }));
