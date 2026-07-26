@@ -51,7 +51,7 @@ We follow the same loop for every feature:
 
 1. **Author a ticket.** Describe the problem, design, scope, and acceptance
    criteria. Tickets live as GitHub issues; their source drafts live under
-   [`Riff Tickets/`](../../tree/main). Use the issue templates in
+   [`docs/tickets/`](./docs/tickets). Use the issue templates in
    [`.github/ISSUE_TEMPLATE`](./.github/ISSUE_TEMPLATE).
 2. **Open a branch** off `main` (see [Branch naming](#branch-naming)).
 3. **Write failing tests first.** Unit tests for logic, integration tests for
@@ -131,7 +131,7 @@ riff/
 │   ├── ui/       # React board (Vite)
 │   ├── mcp/      # Claude Code MCP plugin
 │   └── cli/      # `riff` CLI (start / join / sync)
-├── Riff Tickets/ # ticket drafts (design docs → GitHub issues)
+├── docs/tickets/ # ticket drafts (design docs → GitHub issues)
 └── ...
 ```
 

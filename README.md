@@ -147,7 +147,7 @@ riff/
 │   ├── ui/       # React board (Vite)
 │   ├── mcp/      # Claude Code MCP plugin (publish + consume capsules)
 │   └── cli/      # `riff` CLI (start / join / sync)
-├── Riff Tickets/ # ticket drafts: design docs that become GitHub issues
+├── docs/tickets/ # ticket drafts: design docs that become GitHub issues
 └── .github/      # issue & PR templates, CI
 ```
 
@@ -164,7 +164,7 @@ riff/
 
 > **Pre-alpha and built in the open.** Riff is developed feature by feature,
 > **test-first**, one tracked ticket at a time. The MVP is not yet usable — follow
-> along in [issues](../../issues) and [`Riff Tickets`](./Riff%20Tickets) to see
+> along in [issues](../../issues) and [`docs/tickets`](./docs/tickets) to see
 > what's being designed and built next. Interfaces in this README describe the
 > intended product and will change.
 
