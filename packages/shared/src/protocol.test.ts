@@ -124,7 +124,11 @@ describe('discriminated union narrowing', () => {
 
   it('narrows a parsed riff:pending message', () => {
     const parsed = parseEnvelope(
-      serializeEnvelope({ type: 'riff:pending', capsuleId: capsule.id, fromParticipantId: participant.id }),
+      serializeEnvelope({
+        type: 'riff:pending',
+        capsuleId: capsule.id,
+        fromParticipantId: participant.id,
+      }),
     );
     expect(parsed.msg.type).toBe('riff:pending');
     if (parsed.msg.type === 'riff:pending') {

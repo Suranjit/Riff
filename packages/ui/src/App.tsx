@@ -27,6 +27,7 @@ export function App(): JSX.Element {
   const [state, setState] = useState<BoardState>(initialBoardState);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [riffNotice, setRiffNotice] = useState<string>();
 
   useEffect(() => {
     if (!client) return;
@@ -56,10 +57,24 @@ export function App(): JSX.Element {
 
   function handleRiff(capsule: ContextCapsule): void {
     client?.riff(capsule.id);
+    setRiffNotice(`Riffing on ${capsule.author}'s capsule — continue in your Claude Code.`);
+    window.setTimeout(() => setRiffNotice(undefined), 6000);
   }
 
   if (!client) {
     return <JoinForm onSubmit={handleJoin} error={error} busy={busy} />;
   }
-  return <Board state={state} onRiff={handleRiff} />;
+  return (
+    <>
+      {riffNotice ? (
+        <div
+          role="status"
+          className="fixed inset-x-0 top-0 z-10 bg-violet-600 px-4 py-2 text-center text-sm text-white"
+        >
+          {riffNotice}
+        </div>
+      ) : null}
+      <Board state={state} onRiff={handleRiff} />
+    </>
+  );
 }

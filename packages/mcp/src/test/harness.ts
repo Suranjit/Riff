@@ -40,7 +40,10 @@ export async function startServer(): Promise<ServerHandle> {
   };
 }
 
-function httpsPostJson(url: string, body: unknown): Promise<{ ticket: string; participantId: string }> {
+function httpsPostJson(
+  url: string,
+  body: unknown,
+): Promise<{ ticket: string; participantId: string }> {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const data = JSON.stringify(body);

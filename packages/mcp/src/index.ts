@@ -8,3 +8,5 @@ export { createTools } from './tools.js';
 export type { ToolHandlers, ToolResponse } from './tools.js';
 export { createMcpServer } from './server.js';
 export { normalizeFingerprint, fingerprintsMatch } from './fingerprint.js';
+export { writePendingRiff, readAndClearPendingRiff } from './pendingRiffStore.js';
+export { renderRiffInjection, runHook, defaultStateFile } from './hook.js';

@@ -63,11 +63,10 @@ describe('riff:request routing', () => {
   it("delivers riff:pending to the clicker's other same-identity socket", async () => {
     const grace = await connect('Grace', 'key-grace');
     grace.client.send({ type: 'capsule:publish', capsule: graceCapsule() });
+    await grace.client.next(isType('capsule:updated')); // confirm it's in the store
 
     const adaBrowser = await connect('Ada', 'key-ada');
     const adaClaude = await connect('Ada', 'key-ada'); // same key = same identity
-    await adaBrowser.client.next(isType('capsule:updated'));
-    await adaClaude.client.next(isType('capsule:updated'));
 
     adaBrowser.client.send({
       type: 'riff:request',
@@ -86,9 +85,9 @@ describe('riff:request routing', () => {
   it('uses the authenticated participant id, ignoring a client-claimed one', async () => {
     const grace = await connect('Grace', 'key-grace');
     grace.client.send({ type: 'capsule:publish', capsule: graceCapsule() });
+    await grace.client.next(isType('capsule:updated'));
     const adaBrowser = await connect('Ada', 'key-ada');
     const adaClaude = await connect('Ada', 'key-ada');
-    await adaClaude.client.next(isType('capsule:updated'));
 
     adaBrowser.client.send({
       type: 'riff:request',
@@ -107,10 +106,9 @@ describe('riff:request routing', () => {
   it('does not deliver riff:pending to other participants', async () => {
     const grace = await connect('Grace', 'key-grace');
     grace.client.send({ type: 'capsule:publish', capsule: graceCapsule() });
+    await grace.client.next(isType('capsule:updated'));
     const ada = await connect('Ada', 'key-ada');
     const adaClaude = await connect('Ada', 'key-ada');
-    await adaClaude.client.next(isType('capsule:updated'));
-    await grace.client.next(isType('participant:joined')); // Ada joined
 
     ada.client.send({
       type: 'riff:request',

@@ -5,6 +5,7 @@ import type { TLSSocket } from 'node:tls';
 import { WebSocket } from 'ws';
 import { createCapsule, parseEnvelope, serializeEnvelope, type ContextCapsule } from '@riff/shared';
 import { fingerprintsMatch } from './fingerprint.js';
+import { readAndClearPendingRiff, writePendingRiff } from './pendingRiffStore.js';
 
 /** Fields Claude provides when publishing a capsule. */
 export type PushFields = {
@@ -150,6 +151,14 @@ export class RiffSessionClient implements RiffSessionClientLike {
       for (const c of msg.capsules) this.capsules.set(c.id, c);
     } else if (msg.type === 'capsule:updated') {
       this.capsules.set(msg.capsule.id, msg.capsule);
+    } else if (msg.type === 'riff:pending') {
+      // A Riff was clicked on the board (same identity). Record lineage now and
+      // stage the capsule for the hook / get_pending_riff to deliver as context.
+      const capsule = this.capsules.get(msg.capsuleId);
+      if (capsule) {
+        this.pendingLineage = msg.capsuleId;
+        if (this.opts.stateFile) writePendingRiff(this.opts.stateFile, capsule);
+      }
     }
   }
 
@@ -188,8 +197,8 @@ export class RiffSessionClient implements RiffSessionClientLike {
   }
 
   takePendingRiff(): ContextCapsule | undefined {
-    // TODO(#9): implement (read-and-clear the shared state file).
-    throw new Error('takePendingRiff is not implemented yet (#9)');
+    if (!this.opts.stateFile) return undefined;
+    return readAndClearPendingRiff(this.opts.stateFile);
   }
 
   close(): void {

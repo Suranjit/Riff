@@ -1,4 +1,6 @@
-import type { ContextCapsule } from '@riff/shared';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { contextCapsuleSchema, type ContextCapsule } from '@riff/shared';
 
 /**
  * A tiny file-backed store for a single pending riff, shared between the MCP
@@ -7,13 +9,21 @@ import type { ContextCapsule } from '@riff/shared';
  */
 
 /** Write the capsule to riff on, replacing any pending one. */
-export function writePendingRiff(_path: string, _capsule: ContextCapsule): void {
-  // TODO(#9): implement.
-  throw new Error('writePendingRiff is not implemented yet (#9)');
+export function writePendingRiff(path: string, capsule: ContextCapsule): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(capsule), 'utf8');
 }
 
 /** Return the pending capsule and clear it; undefined if there is none. */
-export function readAndClearPendingRiff(_path: string): ContextCapsule | undefined {
-  // TODO(#9): implement.
-  throw new Error('readAndClearPendingRiff is not implemented yet (#9)');
+export function readAndClearPendingRiff(path: string): ContextCapsule | undefined {
+  if (!existsSync(path)) return undefined;
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch {
+    return undefined;
+  }
+  rmSync(path, { force: true });
+  const parsed = contextCapsuleSchema.safeParse(JSON.parse(raw));
+  return parsed.success ? (parsed.data as ContextCapsule) : undefined;
 }

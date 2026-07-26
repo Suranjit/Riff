@@ -319,7 +319,36 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
             broadcast(sessionId, { type: 'capsule:updated', capsule: stored });
             return;
           }
-          // riff:request handling is deferred to #9; validated and ignored.
+          case 'riff:request': {
+            const exists = store
+              .snapshot(sessionId)
+              .capsules.some((c) => c.id === msg.targetCapsuleId);
+            if (!exists) {
+              send(socket, {
+                type: 'error',
+                code: 'unknown_capsule',
+                message: 'No such capsule to riff on.',
+              });
+              return;
+            }
+            // Route back to the clicker's OWN sockets (their Claude Code picks it
+            // up). The authenticated id is used, never the client-claimed one.
+            const pending: RiffMessage = {
+              type: 'riff:pending',
+              capsuleId: msg.targetCapsuleId,
+              fromParticipantId: participant.id,
+            };
+            const wire = serializeEnvelope(pending);
+            for (const conn of connections.get(sessionId) ?? []) {
+              if (
+                conn.participantId === participant.id &&
+                conn.socket.readyState === conn.socket.OPEN
+              ) {
+                conn.socket.send(wire);
+              }
+            }
+            return;
+          }
           default:
             return;
         }
