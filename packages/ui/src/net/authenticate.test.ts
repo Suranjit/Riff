@@ -35,6 +35,25 @@ describe('authenticate', () => {
     expect(JSON.parse(init.body as string)).toEqual({ credential: 'RIFF-CODE', name: 'Ada' });
   });
 
+  it('includes the participantKey in the body when provided', async () => {
+    const fetchMock = fakeFetch(200, { ticket: 't', participantId: 'p', role: 'guest' });
+    await authenticate({
+      baseUrl: 'https://host:4747',
+      sessionId: SESSION,
+      credential: 'RIFF-CODE',
+      name: 'Ada',
+      participantKey: 'key-ada',
+      fetch: fetchMock,
+    });
+    const call = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    const init = (call?.[1] ?? {}) as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      credential: 'RIFF-CODE',
+      name: 'Ada',
+      participantKey: 'key-ada',
+    });
+  });
+
   it('returns the ticket, participantId and role on success', async () => {
     const result = await authenticate({
       baseUrl: 'https://host:4747',

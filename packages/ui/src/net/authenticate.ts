@@ -23,6 +23,8 @@ export type AuthenticateOptions = {
   /** Join code or host key. */
   credential: string;
   name: string;
+  /** Stable per-person key so a browser and Claude Code share one identity. */
+  participantKey?: string;
   /** Injectable fetch (defaults to global fetch). */
   fetch?: typeof fetch;
 };

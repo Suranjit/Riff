@@ -233,8 +233,13 @@ export async function connectClient(
   sessionId: string,
   credential: string,
   name: string,
+  participantKey?: string,
 ): Promise<TestClient> {
-  const res = await httpsPostJson(h.authUrl(sessionId), { credential, name }, { origin: h.origin });
+  const res = await httpsPostJson(
+    h.authUrl(sessionId),
+    { credential, name, participantKey },
+    { origin: h.origin },
+  );
   const { ticket } = res.body as { ticket: string };
   const socket = openSocket(h.wsUrl(sessionId, ticket), h.origin);
   const client = new TestClient(socket);
