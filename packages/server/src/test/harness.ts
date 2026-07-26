@@ -191,6 +191,11 @@ export class TestClient {
     });
   }
 
+  /** Currently buffered messages matching the predicate (without consuming). */
+  buffered(predicate: (m: RiffMessage) => boolean): RiffMessage[] {
+    return this.queue.filter(predicate);
+  }
+
   send(msg: RiffMessage): void {
     this.socket.send(serializeEnvelope(msg));
   }

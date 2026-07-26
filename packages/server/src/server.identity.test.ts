@@ -60,31 +60,28 @@ describe('shared participant identity', () => {
   });
 
   it('emits a single participant:joined for two sockets sharing a key', async () => {
-    // Observer with its own identity.
     const observer = await connectClient(h, SESSION, TEST_JOIN_CODE, 'Obs');
     clients.push(observer);
-
-    const joins: RiffMessage[] = [];
-    // Collect any joins the observer sees over a short window.
-    void observer.next(isType('participant:joined')).then((m) => joins.push(m));
 
     // Two sockets, same person (same key).
     const id = await auth(h, 'Ada', 'key-ada');
     const s1 = openSocket(h.wsUrl(SESSION, id.ticket), h.origin);
     sockets.push(s1);
     await waitOpen(s1);
-    const id2 = await auth(h, 'Ada', 'key-ada');
-    const s2 = openSocket(h.wsUrl(SESSION, id2.ticket), h.origin);
-    sockets.push(s2);
-    await waitOpen(s2);
 
+    // The first socket announces Ada.
     const joined = (await observer.next(isType('participant:joined'))) as Extract<
       RiffMessage,
       { type: 'participant:joined' }
     >;
     expect(joined.participant.name).toBe('Ada');
 
-    // A snapshot taken now should list Ada exactly once.
+    const id2 = await auth(h, 'Ada', 'key-ada');
+    const s2 = openSocket(h.wsUrl(SESSION, id2.ticket), h.origin);
+    sockets.push(s2);
+    await waitOpen(s2);
+
+    // Synchronize via a fresh client's snapshot: it lists Ada exactly once...
     const late = await connectClient(h, SESSION, TEST_JOIN_CODE, 'Late');
     clients.push(late);
     const snap = (await late.next(isType('session:snapshot'))) as Extract<
@@ -92,6 +89,15 @@ describe('shared participant identity', () => {
       { type: 'session:snapshot' }
     >;
     expect(snap.participants.filter((p) => p.name === 'Ada')).toHaveLength(1);
+
+    // ...and the second socket produced no further participant:joined.
+    const adaJoins = observer
+      .buffered(isType('participant:joined'))
+      .filter(
+        (m) =>
+          (m as Extract<RiffMessage, { type: 'participant:joined' }>).participant.name === 'Ada',
+      );
+    expect(adaJoins).toHaveLength(0);
   });
 
   it('keeps the participant present until the last socket closes', async () => {
@@ -109,13 +115,10 @@ describe('shared participant identity', () => {
     sockets.push(s2);
     await waitOpen(s2);
 
-    // Closing one socket must NOT remove the participant.
-    let left = false;
-    void observer.next(isType('participant:left')).then(() => (left = true));
+    // Close one socket; the participant must remain present.
     s1.close();
 
-    // Give the server a beat, then verify no participant:left yet by checking a
-    // fresh snapshot still lists Ada.
+    // Synchronize via a probe snapshot, which still lists Ada...
     const probe = await connectClient(h, SESSION, TEST_JOIN_CODE, 'Probe');
     clients.push(probe);
     const snap = (await probe.next(isType('session:snapshot'))) as Extract<
@@ -123,7 +126,8 @@ describe('shared participant identity', () => {
       { type: 'session:snapshot' }
     >;
     expect(snap.participants.some((p) => p.name === 'Ada')).toBe(true);
-    expect(left).toBe(false);
+    // ...and no participant:left was broadcast for the non-final socket.
+    expect(observer.buffered(isType('participant:left'))).toHaveLength(0);
 
     // Closing the last socket emits participant:left.
     const leftMsg = observer.next(isType('participant:left'));

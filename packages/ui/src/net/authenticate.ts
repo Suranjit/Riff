@@ -36,7 +36,11 @@ export async function authenticate(opts: AuthenticateOptions): Promise<AuthResul
   const res = await doFetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ credential: opts.credential, name: opts.name }),
+    body: JSON.stringify({
+      credential: opts.credential,
+      name: opts.name,
+      ...(opts.participantKey ? { participantKey: opts.participantKey } : {}),
+    }),
   });
 
   if (!res.ok) {
