@@ -1,4 +1,5 @@
 import type { Participant } from '@riff/shared';
+import { Avatar } from './Avatar.js';
 
 export type ParticipantBarProps = {
   participants: Participant[];
@@ -8,20 +9,26 @@ export type ParticipantBarProps = {
 
 export function ParticipantBar({ participants, selfId }: ParticipantBarProps): JSX.Element {
   return (
-    <div className="flex flex-wrap items-center gap-2" aria-label="Participants">
-      {participants.map((p) => (
-        <span
-          key={p.id}
-          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700"
-        >
-          <span
-            className={`h-2 w-2 rounded-full ${p.role === 'host' ? 'bg-amber-500' : 'bg-emerald-500'}`}
-            aria-hidden
-          />
-          {p.name}
-          {p.id === selfId ? <span className="text-xs text-slate-400">(you)</span> : null}
-        </span>
-      ))}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label="Participants">
+      <div className="flex -space-x-2">
+        {participants.slice(0, 6).map((p) => (
+          <Avatar key={p.id} name={p.name} className="h-7 w-7 text-[10px]" />
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+        {participants.map((p) => (
+          <span key={p.id} className="inline-flex items-center gap-1">
+            {p.role === 'host' ? (
+              <span aria-hidden title="Host" className="text-[10px] text-amber-500">
+                ★
+              </span>
+            ) : null}
+            {p.name}
+            {p.id === selfId ? <span className="text-xs text-ink-faint">(you)</span> : null}
+          </span>
+        ))}
+        {participants.length === 0 ? <span className="text-ink-faint">No one here yet</span> : null}
+      </div>
     </div>
   );
 }

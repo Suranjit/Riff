@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ContextCapsule } from '@riff/shared';
 import { authenticate, AuthError } from './net/authenticate.js';
-import { RiffClient } from './net/RiffClient.js';
+import { RiffClient, type ConnectionState } from './net/RiffClient.js';
 import { initialBoardState, type BoardState } from './state/boardReducer.js';
-import { Board } from './components/Board.js';
-import { JoinForm } from './components/JoinForm.js';
 import { resolveParticipantKey } from './net/participantKey.js';
+import { Board } from './components/Board.js';
+import { ConnectionPill } from './components/ConnectionPill.js';
+import { JoinForm } from './components/JoinForm.js';
 
 /** Read the session id from a `/room/:id` path. */
 function sessionIdFromLocation(): string {
@@ -25,6 +26,7 @@ export function App(): JSX.Element {
 
   const [client, setClient] = useState<RiffClient | null>(null);
   const [state, setState] = useState<BoardState>(initialBoardState);
+  const [connection, setConnection] = useState<ConnectionState>('connecting');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [riffNotice, setRiffNotice] = useState<string>();
@@ -32,7 +34,13 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!client) return;
     setState(client.state);
-    return client.subscribe(setState);
+    setConnection(client.connectionState);
+    const offState = client.subscribe(setState);
+    const offConn = client.onConnection(setConnection);
+    return () => {
+      offState();
+      offConn();
+    };
   }, [client]);
 
   async function handleJoin({ name, code }: { name: string; code: string }): Promise<void> {
@@ -64,17 +72,37 @@ export function App(): JSX.Element {
   if (!client) {
     return <JoinForm onSubmit={handleJoin} error={error} busy={busy} />;
   }
+
   return (
-    <>
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-stone-200/70 bg-paper/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
+          <div className="flex items-baseline gap-3">
+            <span className="text-[17px] font-bold tracking-[-0.02em] text-ink">
+              <span aria-hidden>🎸 </span>Riff
+            </span>
+            {sessionId ? (
+              <span className="hidden rounded-md bg-stone-100 px-2 py-0.5 font-mono text-[11px] text-ink-soft sm:inline">
+                room {sessionId.slice(0, 8)}
+              </span>
+            ) : null}
+          </div>
+          <ConnectionPill state={connection} />
+        </div>
+      </header>
+
       {riffNotice ? (
         <div
           role="status"
-          className="fixed inset-x-0 top-0 z-10 bg-violet-600 px-4 py-2 text-center text-sm text-white"
+          className="fixed inset-x-0 top-16 z-20 mx-auto w-fit animate-fade-up rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-white shadow-card-hover"
         >
-          {riffNotice}
+          ♪ {riffNotice}
         </div>
       ) : null}
-      <Board state={state} onRiff={handleRiff} />
-    </>
+
+      <main>
+        <Board state={state} onRiff={handleRiff} />
+      </main>
+    </div>
   );
 }
