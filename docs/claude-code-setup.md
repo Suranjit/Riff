@@ -1,93 +1,58 @@
 # Connecting Claude Code to a Riff session
 
-To publish your Context Capsule to the board and riff on teammates' capsules,
-connect Claude Code to a running Riff host (`riff start`) with the MCP plugin,
-and — for the seamless browser Riff button — a `UserPromptSubmit` hook.
+Riff is designed so participants connect in **one command** — no config editing.
 
-> Pre-alpha: the package isn't published yet, so paths below assume a source
-> checkout. Replace `riff-mcp` / `riff-hook` with the built bins once released.
+## The easy way (recommended)
 
-## 1. Values from `riff start`
+1. The host runs `riff start` (or `npx riffboard start`) and shares the board URL
+   + join code with the room.
+2. You open the board, verify the certificate fingerprint, and join with the code.
+3. On the board, click **Connect Claude Code** — it copies a command like:
 
-`riff start` prints everything you need:
+   ```
+   npx riffboard join "https://192.168.1.20:4747/room/<id>#c=RIFF-…&fp=sha256:…&me=…&name=…"
+   ```
 
-```
-→ Open on your network:  https://192.168.1.20:4747/room/<sessionId>
-→ Join code:             RIFF-4F9K-2A7Q
-→ Verify fingerprint:    sha256:<fingerprint>
-```
+4. Paste it in a terminal and press enter. It:
+   - saves the session to `~/.riff/session.json`, and
+   - registers the Riff MCP server and the two hooks in your Claude Code config
+     (**once** — every future session is just another paste).
+5. **Restart Claude Code** once. Done.
 
-## 2. Add the Riff MCP server
+Because the copied command embeds your personal key (`me=`), your browser and
+your Claude Code count as **one participant**.
 
-Configure the `riff-mcp` server for your project (e.g. in `.mcp.json`), passing
-the session details as environment variables:
+Every later session: click **Connect Claude Code** on the new board, paste, and
+keep working — no restart needed after the first time.
 
-```json
-{
-  "mcpServers": {
-    "riff": {
-      "command": "riff-mcp",
-      "env": {
-        "RIFF_URL": "https://192.168.1.20:4747",
-        "RIFF_SESSION": "<sessionId>",
-        "RIFF_JOIN_CODE": "RIFF-4F9K-2A7Q",
-        "RIFF_NAME": "Ada",
-        "RIFF_FINGERPRINT": "sha256:<fingerprint>",
-        "RIFF_STATE_FILE": "/tmp/riff-pending-riff.json"
-      }
-    }
-  }
-}
-```
+> The host banner also prints a `npx riffboard join "…"` command (without a
+> personal key) you can share directly.
 
-`RIFF_FINGERPRINT` pins the host certificate (the plugin refuses to connect
-without it — set `RIFF_INSECURE=1` only for throwaway local testing).
+## What gets installed
 
-On startup the plugin prints your **personal board link** (`…/room/<id>?me=<key>`)
-to stderr — open *that* URL in your browser so your board and Claude Code count
-as one participant.
+`riff join` writes, idempotently and without clobbering your existing config:
 
-Tools exposed: `push_capsule`, `list_capsules`, `pull_capsule`, `get_pending_riff`.
+- `~/.claude.json` → `mcpServers.riff = { command: "npx", args: ["-y", "riffboard", "mcp"] }`
+- `~/.claude/settings.json` → a `UserPromptSubmit` hook (`npx -y riffboard hook`)
+  and a `Stop` hook (`npx -y riffboard autopush`).
 
-## 3. (Optional but recommended) the auto-inject hook
+These commands are static — they read `~/.riff/session.json`, so they never need
+editing again.
 
-So that clicking **Riff** in the browser lands in Claude Code with no tool call,
-add a `UserPromptSubmit` hook that runs `riff-hook`. It reads the same
-`RIFF_STATE_FILE` and injects the queued capsule before your next message:
+## What you get
 
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [{ "type": "command", "command": "RIFF_STATE_FILE=/tmp/riff-pending-riff.json riff-hook" }]
-      }
-    ]
-  }
-}
-```
+- **Tools:** `push_capsule`, `list_capsules`, `pull_capsule`, `get_pending_riff`.
+- **Riff button → your session:** click Riff on the board, then just keep typing
+  in Claude Code — the `UserPromptSubmit` hook injects the capsule's context
+  before your next message (no tool call, no copy-paste).
+- **Auto-push:** the `Stop` hook nudges Claude to refresh your capsule about once
+  a minute (tune with `RIFF_AUTOPUSH_INTERVAL_MS`).
 
-With the hook installed: click Riff on a card in the browser, switch to Claude
-Code, and just keep typing — the teammate's context is already there. Without it,
-call the `get_pending_riff` tool (or say "riff on it") to pull the queued context.
+## Manual configuration (advanced)
 
-## 4. (Optional) auto-push your capsule
-
-So your card refreshes roughly every minute without manual `push_capsule` calls,
-add a `Stop` hook that runs `riff-autopush`. When enough time has passed it nudges
-Claude to push a fresh summary (debounced so it never loops):
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{ "type": "command", "command": "riff-autopush" }]
-      }
-    ]
-  }
-}
-```
-
-Tune the cadence with `RIFF_AUTOPUSH_INTERVAL_MS` (default `60000`). This costs at
-most one extra turn per interval while you're actively working.
+If you'd rather not use `riff join`, set the Riff MCP server up yourself and pass
+the session via environment variables (`RIFF_URL`, `RIFF_SESSION`,
+`RIFF_JOIN_CODE`, `RIFF_NAME`, `RIFF_FINGERPRINT`, optionally
+`RIFF_PARTICIPANT_KEY`). Environment variables take precedence over
+`~/.riff/session.json`. `RIFF_FINGERPRINT` pins the host certificate; the plugin
+refuses to connect without it unless `RIFF_INSECURE=1`.

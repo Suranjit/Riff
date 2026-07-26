@@ -89,21 +89,19 @@ The unit of sharing in Riff — a compact, structured snapshot of one person's t
 
 ## Quick start
 
-> Riff is not yet published to npm — run it from source (a packaging pass is on
-> the roadmap). **Prerequisites:** [Node.js](https://nodejs.org) ≥ 22 and
-> [pnpm](https://pnpm.io) 9 (`corepack enable pnpm`).
+**Prerequisite:** [Node.js](https://nodejs.org) ≥ 22.
+
+**Host a session** (one person):
 
 ```bash
-git clone https://github.com/<owner>/riff.git
-cd riff
-pnpm install
-pnpm build                              # build the board
-
-# Host a session (add --demo to seed sample capsules)
-pnpm --filter @riff/cli start
+npx riffboard start          # add --demo to seed sample capsules
 ```
 
-You'll see:
+**Everyone else** opens the printed URL, verifies the fingerprint, and joins with
+the code. To connect Claude Code, they click **Connect Claude Code** on the board
+and paste the one command it copies — see [below](#connect-claude-code).
+
+The host sees:
 
 ```
   🎸 Riff session ready
@@ -121,16 +119,22 @@ the fingerprint**, and joins with the code.
 
 ## Connect Claude Code
 
-Each participant connects their Claude Code with the Riff MCP plugin — that's what
-publishes capsules and receives riffs. Full setup (MCP config, the auto-inject
-hook, and the auto-push hook) is in
+On the board, click **Connect Claude Code** and paste the copied command:
+
+```bash
+npx riffboard join "https://…/room/<id>#c=…&fp=…&me=…&name=…"
+```
+
+It saves the session and registers the Riff MCP server + hooks in your Claude Code
+config — **once**. Restart Claude Code the first time; every later session is just
+another paste. Full details (including manual setup) are in
 **[docs/claude-code-setup.md](./docs/claude-code-setup.md)**.
 
 Tools the plugin exposes: `push_capsule` · `list_capsules` · `pull_capsule` · `get_pending_riff`.
 
 ## Architecture
 
-A [pnpm](https://pnpm.io) monorepo of small, single-purpose packages — 199 tests,
+A [pnpm](https://pnpm.io) monorepo of small, single-purpose packages — 231 tests,
 written before the code they specify:
 
 ```
@@ -140,7 +144,7 @@ riff/
 │   ├── server/   # local host: TLS, join-code auth, signed tickets, WSS sync
 │   ├── ui/       # the board (React + Vite + Tailwind)
 │   ├── mcp/      # Claude Code plugin: tools + riff/auto-push hooks
-│   └── cli/      # `riff start`
+│   └── cli/      # the `riffboard` package: start / join / mcp / hooks
 ├── docs/
 │   ├── tickets/          # every feature's design doc (ticket-first workflow)
 │   ├── security/         # threat model
@@ -169,9 +173,10 @@ Details and limitations: [threat model](./docs/security/threat-model.md) ·
 ## Project status
 
 > **MVP complete, pre-release.** Every core feature below is built and tested
-> (test-first, one ticket at a time — see [`docs/tickets`](./docs/tickets)).
-> Remaining before a first release: packaging for `npx riff start`, broader
-> real-world testing, and docs hardening. Expect rough edges.
+> (test-first, one ticket at a time — see [`docs/tickets`](./docs/tickets)), and
+> the `riffboard` package runs standalone from a packed tarball. Remaining before
+> a first release: publishing to npm, broader real-world testing, and docs
+> hardening. Expect rough edges.
 
 ## Roadmap
 
@@ -185,10 +190,12 @@ Details and limitations: [threat model](./docs/security/threat-model.md) ·
 - [x] Riff button → auto-inject into your Claude Code (hook)
 - [x] Auto-push — capsules refresh ~every minute (Stop hook)
 - [x] `riff start` — one command to host, with `--demo` seeding
+- [x] One-command join — `npx riffboard join` installs the Claude Code integration
+- [x] Packaging — bundled `riffboard` package, runnable via `npx`
 
 **Next**
 
-- [ ] Packaging — `npx riff start` without a source checkout
+- [ ] Publish `riffboard` to npm
 - [ ] Session recap / export when the meeting ends
 - [ ] Lineage graph view (who riffed on whom, visually)
 - [ ] Cross-network sessions (opt-in relay)
