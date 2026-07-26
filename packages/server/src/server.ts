@@ -37,6 +37,11 @@ export type RiffServerOptions = {
   ticketTtlMs?: number;
   /** Interface to bind (default `0.0.0.0` for LAN). */
   host?: string;
+  /**
+   * Directory of built board assets to serve. When set, the server serves these
+   * files and falls back to `index.html` for non-API GET routes (SPA routing).
+   */
+  staticDir?: string;
   /** Injectable clock (unix ms). Defaults to `Date.now`. */
   now?: () => number;
 };

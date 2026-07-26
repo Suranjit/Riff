@@ -1,0 +1,23 @@
+{
+  "name": "@riff/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The riff CLI — host a live brainstorming session with one command.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "riff": "./dist/cli.js"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@riff/server": "workspace:*",
+    "@riff/shared": "workspace:*",
+    "@riff/ui": "workspace:*",
+    "commander": "^12.1.0"
+  }
+}
