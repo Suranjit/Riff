@@ -53,17 +53,72 @@ export type CreateCapsuleInput = {
   now: number;
 };
 
-// TODO(#1): implement — placeholder schema so tests compile and run red.
-export const participantSchema = z.never();
+/** A non-empty, trimmed string with a maximum length. */
+const boundedText = (max: number) =>
+  z
+    .string()
+    .transform((s) => s.trim())
+    .pipe(z.string().min(1).max(max));
 
-// TODO(#1): implement — placeholder schema so tests compile and run red.
-export const contextCapsuleSchema = z.never();
+/** A list of bounded, non-empty strings, capped at `maxItems` entries. */
+const boundedList = (maxItems: number, maxLen: number) =>
+  z.array(boundedText(maxLen)).max(maxItems);
+
+export const participantSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: boundedText(60),
+    role: z.enum(['host', 'guest']),
+    joinedAt: z.number().int().nonnegative(),
+  })
+  .strip();
+
+export const contextCapsuleSchema = z
+  .object({
+    id: z.string().uuid(),
+    sessionId: z.string().uuid(),
+    author: boundedText(60),
+    objective: boundedText(500),
+    // `approach` is optional prose: may be empty, but still bounded.
+    approach: z
+      .string()
+      .transform((s) => s.trim())
+      .pipe(z.string().max(500)),
+    keyFindings: boundedList(20, 500),
+    openQuestions: boundedList(20, 500),
+    riffedFrom: z.string().uuid().optional(),
+    pushMode: z.enum(['auto', 'manual']),
+    createdAt: z.number().int().nonnegative(),
+    updatedAt: z.number().int().nonnegative(),
+  })
+  .strip()
+  .refine((c) => c.updatedAt >= c.createdAt, {
+    message: 'updatedAt must be greater than or equal to createdAt',
+    path: ['updatedAt'],
+  })
+  .refine((c) => c.riffedFrom !== c.id, {
+    message: 'a capsule cannot riff on itself (riffedFrom must differ from id)',
+    path: ['riffedFrom'],
+  });
 
 /**
  * Build a validated {@link ContextCapsule}, filling defaults (timestamps from
  * the injected `now`, empty finding/question arrays). Pure: no clocks or RNG.
+ *
+ * @throws {z.ZodError} if the resulting capsule violates {@link contextCapsuleSchema}.
  */
-export function createCapsule(_input: CreateCapsuleInput): ContextCapsule {
-  // TODO(#1): implement.
-  throw new Error('createCapsule is not implemented yet (#1)');
+export function createCapsule(input: CreateCapsuleInput): ContextCapsule {
+  return contextCapsuleSchema.parse({
+    id: input.id,
+    sessionId: input.sessionId,
+    author: input.author,
+    objective: input.objective,
+    approach: input.approach ?? '',
+    keyFindings: input.keyFindings ?? [],
+    openQuestions: input.openQuestions ?? [],
+    riffedFrom: input.riffedFrom,
+    pushMode: input.pushMode,
+    createdAt: input.now,
+    updatedAt: input.now,
+  }) as ContextCapsule;
 }

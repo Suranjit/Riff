@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contextCapsuleSchema, participantSchema } from './capsule.js';
 import type { ContextCapsule, Participant } from './capsule.js';
 
 /** Wire protocol version. Bumped on any breaking change to message shapes. */
@@ -36,22 +37,60 @@ export class ProtocolError extends Error {
   }
 }
 
-// TODO(#1): implement — placeholder schemas so tests compile and run red.
-export const riffMessageSchema = z.never();
-export const envelopeSchema = z.never();
+export const riffMessageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('capsule:publish'), capsule: contextCapsuleSchema }),
+  z.object({
+    type: z.literal('riff:request'),
+    fromParticipantId: z.string().uuid(),
+    targetCapsuleId: z.string().uuid(),
+  }),
+  z.object({
+    type: z.literal('session:snapshot'),
+    participants: z.array(participantSchema),
+    capsules: z.array(contextCapsuleSchema),
+  }),
+  z.object({ type: z.literal('capsule:updated'), capsule: contextCapsuleSchema }),
+  z.object({ type: z.literal('participant:joined'), participant: participantSchema }),
+  z.object({ type: z.literal('participant:left'), participantId: z.string().uuid() }),
+  z.object({ type: z.literal('error'), code: z.string().min(1), message: z.string() }),
+]);
+
+export const envelopeSchema = z.object({
+  v: z.number().int(),
+  msg: riffMessageSchema,
+});
 
 /**
  * Parse and validate an incoming wire string into an {@link Envelope}.
  * Throws {@link ProtocolError} on malformed JSON, version mismatch, or an
  * invalid/unknown message.
  */
-export function parseEnvelope(_raw: string): Envelope {
-  // TODO(#1): implement.
-  throw new Error('parseEnvelope is not implemented yet (#1)');
+export function parseEnvelope(raw: string): Envelope {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new ProtocolError('Envelope is not valid JSON', 'malformed_json');
+  }
+
+  // Check the version before validating the body so a version mismatch is
+  // reported as such, even when the payload is otherwise well-formed.
+  const version = (json as { v?: unknown } | null)?.v;
+  if (version !== PROTOCOL_VERSION) {
+    throw new ProtocolError(
+      `Unsupported protocol version: expected ${PROTOCOL_VERSION}, got ${String(version)}`,
+      'version_mismatch',
+    );
+  }
+
+  const result = envelopeSchema.safeParse(json);
+  if (!result.success) {
+    throw new ProtocolError(result.error.message, 'invalid_message');
+  }
+  return result.data as Envelope;
 }
 
 /** Wrap a message in the current protocol envelope and serialize to a string. */
-export function serializeEnvelope(_msg: RiffMessage, _v: number = PROTOCOL_VERSION): string {
-  // TODO(#1): implement.
-  throw new Error('serializeEnvelope is not implemented yet (#1)');
+export function serializeEnvelope(msg: RiffMessage, v: number = PROTOCOL_VERSION): string {
+  return JSON.stringify({ v, msg } satisfies Envelope);
 }

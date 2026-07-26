@@ -133,13 +133,15 @@ describe('contextCapsuleSchema', () => {
   describe('timestamps', () => {
     it('rejects updatedAt earlier than createdAt', () => {
       expect(
-        contextCapsuleSchema.safeParse(validCapsule({ createdAt: 2_000, updatedAt: 1_000 })).success,
+        contextCapsuleSchema.safeParse(validCapsule({ createdAt: 2_000, updatedAt: 1_000 }))
+          .success,
       ).toBe(false);
     });
 
     it('accepts updatedAt equal to createdAt', () => {
       expect(
-        contextCapsuleSchema.safeParse(validCapsule({ createdAt: 2_000, updatedAt: 2_000 })).success,
+        contextCapsuleSchema.safeParse(validCapsule({ createdAt: 2_000, updatedAt: 2_000 }))
+          .success,
       ).toBe(true);
     });
   });
