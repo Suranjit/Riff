@@ -19,6 +19,8 @@ export interface RiffSessionClientLike {
   pushCapsule(fields: PushFields): ContextCapsule;
   listCapsules(): ContextCapsule[];
   pullCapsule(capsuleId: string): ContextCapsule | undefined;
+  /** Read-and-clear a pending riff queued from the board's Riff button. */
+  takePendingRiff(): ContextCapsule | undefined;
 }
 
 export type RiffSessionClientOptions = {
@@ -33,6 +35,8 @@ export type RiffSessionClientOptions = {
   fingerprint?: string;
   /** Allow connecting without a fingerprint (local testing escape hatch). */
   insecure?: boolean;
+  /** File shared with the UserPromptSubmit hook for pending riffs. */
+  stateFile?: string;
   now?: () => number;
   newId?: () => string;
 };
@@ -181,6 +185,11 @@ export class RiffSessionClient implements RiffSessionClientLike {
     const capsule = this.capsules.get(capsuleId);
     if (capsule) this.pendingLineage = capsuleId;
     return capsule;
+  }
+
+  takePendingRiff(): ContextCapsule | undefined {
+    // TODO(#9): implement (read-and-clear the shared state file).
+    throw new Error('takePendingRiff is not implemented yet (#9)');
   }
 
   close(): void {
