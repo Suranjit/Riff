@@ -1,4 +1,6 @@
-import type { SelfSignedCert } from '@riff/server';
+import { randomBytes as nodeRandomBytes, randomUUID as nodeRandomUUID } from 'node:crypto';
+import { generateSelfSignedCert, type SelfSignedCert } from '@riff/server';
+import { generateJoinCode } from './generateJoinCode.js';
 
 /** The secrets and certificate that define a hosted session. */
 export type SessionConfig = {
@@ -17,7 +19,16 @@ export type SessionDeps = {
 };
 
 /** Assemble the secrets + certificate for a new session. */
-export function createSession(_deps?: Partial<SessionDeps>): SessionConfig {
-  // TODO(#12): implement.
-  throw new Error('createSession is not implemented yet (#12)');
+export function createSession(deps: Partial<SessionDeps> = {}): SessionConfig {
+  const randomUUID = deps.randomUUID ?? nodeRandomUUID;
+  const randomBytes = deps.randomBytes ?? nodeRandomBytes;
+  const generateCert = deps.generateCert ?? generateSelfSignedCert;
+
+  return {
+    sessionId: randomUUID(),
+    joinCode: generateJoinCode(randomBytes(5)),
+    hostKey: randomBytes(24).toString('base64url'),
+    signingSecret: randomBytes(32),
+    cert: generateCert(),
+  };
 }

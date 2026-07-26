@@ -5,7 +5,17 @@ export type BannerInfo = {
 };
 
 /** Render the human-facing startup banner printed by `riff start`. */
-export function formatStartupBanner(_info: BannerInfo): string {
-  // TODO(#12): implement.
-  throw new Error('formatStartupBanner is not implemented yet (#12)');
+export function formatStartupBanner({ url, joinCode, fingerprint }: BannerInfo): string {
+  return [
+    '',
+    '  🎸 Riff session ready',
+    '',
+    `  → Open on your network:  ${url}`,
+    `  → Join code:             ${joinCode}`,
+    `  → Verify fingerprint:    ${fingerprint}`,
+    '',
+    '  Share the join code with the room. Everyone opens the URL, checks the',
+    '  fingerprint matches in their browser, and joins. Press Ctrl-C to stop.',
+    '',
+  ].join('\n');
 }

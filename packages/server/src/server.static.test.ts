@@ -2,7 +2,13 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { httpsGet, httpsPostJson, startHarness, TEST_JOIN_CODE, type Harness } from './test/harness.js';
+import {
+  httpsGet,
+  httpsPostJson,
+  startHarness,
+  TEST_JOIN_CODE,
+  type Harness,
+} from './test/harness.js';
 
 const SESSION = '11111111-1111-4111-8111-111111111111';
 const INDEX_HTML = '<!doctype html><title>Riff Board</title><div id="root"></div>';

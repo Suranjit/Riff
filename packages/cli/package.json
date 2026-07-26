@@ -12,6 +12,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "start": "tsx src/cli.ts start",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

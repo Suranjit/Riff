@@ -29,7 +29,11 @@ function request(
         method,
         rejectUnauthorized: false,
         headers: body
-          ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), ...headers }
+          ? {
+              'content-type': 'application/json',
+              'content-length': Buffer.byteLength(body),
+              ...headers,
+            }
           : headers,
       },
       (res) => {
