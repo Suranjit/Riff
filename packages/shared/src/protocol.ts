@@ -3,7 +3,7 @@ import { contextCapsuleSchema, participantSchema } from './capsule.js';
 import type { ContextCapsule, Participant } from './capsule.js';
 
 /** Wire protocol version. Bumped on any breaking change to message shapes. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /**
  * Every message exchanged between the Riff server and its clients (the board UI
@@ -18,6 +18,7 @@ export type RiffMessage =
   | { type: 'capsule:updated'; capsule: ContextCapsule }
   | { type: 'participant:joined'; participant: Participant }
   | { type: 'participant:left'; participantId: string }
+  | { type: 'riff:pending'; capsuleId: string; fromParticipantId: string }
   | { type: 'error'; code: string; message: string };
 
 /** The versioned wrapper every message travels inside on the wire. */
@@ -41,7 +42,8 @@ export const riffMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('capsule:publish'), capsule: contextCapsuleSchema }),
   z.object({
     type: z.literal('riff:request'),
-    fromParticipantId: z.string().uuid(),
+    // Client-claimed; the server ignores it in favour of the authenticated id.
+    fromParticipantId: z.string().min(1),
     targetCapsuleId: z.string().uuid(),
   }),
   z.object({
@@ -52,6 +54,11 @@ export const riffMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('capsule:updated'), capsule: contextCapsuleSchema }),
   z.object({ type: z.literal('participant:joined'), participant: participantSchema }),
   z.object({ type: z.literal('participant:left'), participantId: z.string().uuid() }),
+  z.object({
+    type: z.literal('riff:pending'),
+    capsuleId: z.string().uuid(),
+    fromParticipantId: z.string().min(1),
+  }),
   z.object({ type: z.literal('error'), code: z.string().min(1), message: z.string() }),
 ]);
 

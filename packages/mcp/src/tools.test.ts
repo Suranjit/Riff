@@ -26,6 +26,7 @@ function fakeClient(overrides: Partial<RiffSessionClientLike> = {}): RiffSession
     pushCapsule: vi.fn((_f: PushFields) => capsule()),
     listCapsules: vi.fn(() => [capsule()]),
     pullCapsule: vi.fn((_id: string) => capsule()),
+    takePendingRiff: vi.fn(() => capsule()),
     ...overrides,
   };
 }
@@ -77,5 +78,21 @@ describe('pull_capsule', () => {
     const tools = createTools(client);
     const res = tools.pull_capsule({ capsuleId: 'nope' });
     expect(res.isError).toBe(true);
+  });
+});
+
+describe('get_pending_riff', () => {
+  it('returns the queued capsule context', () => {
+    const client = fakeClient();
+    const tools = createTools(client);
+    const res = tools.get_pending_riff();
+    expect(client.takePendingRiff).toHaveBeenCalled();
+    expect(res.content[0]?.text).toContain('Explore the graph model');
+  });
+
+  it('reports when there is nothing queued', () => {
+    const tools = createTools(fakeClient({ takePendingRiff: vi.fn(() => undefined) }));
+    const res = tools.get_pending_riff();
+    expect(res.content[0]?.text).toMatch(/no pending riffs/i);
   });
 });

@@ -37,8 +37,15 @@ const messages: RiffMessage[] = [
   { type: 'capsule:updated', capsule },
   { type: 'participant:joined', participant },
   { type: 'participant:left', participantId: participant.id },
+  { type: 'riff:pending', capsuleId: capsule.id, fromParticipantId: participant.id },
   { type: 'error', code: 'room_full', message: 'This session is full.' },
 ];
+
+describe('PROTOCOL_VERSION', () => {
+  it('is 2', () => {
+    expect(PROTOCOL_VERSION).toBe(2);
+  });
+});
 
 describe('serializeEnvelope / parseEnvelope', () => {
   it('round-trips every message variant', () => {
@@ -112,6 +119,21 @@ describe('discriminated union narrowing', () => {
     if (parsed.msg.type === 'capsule:updated') {
       // Type narrowing makes `.capsule` available here.
       expect(contextCapsuleSchema.safeParse(parsed.msg.capsule).success).toBe(true);
+    }
+  });
+
+  it('narrows a parsed riff:pending message', () => {
+    const parsed = parseEnvelope(
+      serializeEnvelope({
+        type: 'riff:pending',
+        capsuleId: capsule.id,
+        fromParticipantId: participant.id,
+      }),
+    );
+    expect(parsed.msg.type).toBe('riff:pending');
+    if (parsed.msg.type === 'riff:pending') {
+      expect(parsed.msg.capsuleId).toBe(capsule.id);
+      expect(parsed.msg.fromParticipantId).toBe(participant.id);
     }
   });
 });

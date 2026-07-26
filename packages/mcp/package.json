@@ -6,7 +6,8 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "riff-mcp": "./dist/mcp.js"
+    "riff-mcp": "./dist/mcp.js",
+    "riff-hook": "./dist/riff-hook.js"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

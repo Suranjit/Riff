@@ -33,5 +33,11 @@ export function createMcpServer(client: RiffSessionClientLike): McpServer {
     (args) => tools.pull_capsule(args),
   );
 
+  server.tool(
+    'get_pending_riff',
+    'Return any capsule queued by clicking Riff on the board, as context to build on. Call this if the user says they riffed on something.',
+    () => tools.get_pending_riff(),
+  );
+
   return server;
 }

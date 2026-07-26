@@ -12,6 +12,7 @@ export type ToolHandlers = {
   push_capsule(args: unknown): ToolResponse;
   list_capsules(): ToolResponse;
   pull_capsule(args: unknown): ToolResponse;
+  get_pending_riff(): ToolResponse;
 };
 
 export const pushArgsSchema = z.object({
@@ -65,6 +66,16 @@ export function createTools(client: RiffSessionClientLike): ToolHandlers {
       if (!capsule) return text(`No capsule found with id ${parsed.data.capsuleId}.`, true);
       return text(
         `Riffing on ${capsule.author}'s capsule. Build on this context:\n\n${renderCapsule(capsule)}`,
+      );
+    },
+
+    get_pending_riff() {
+      const capsule = client.takePendingRiff();
+      if (!capsule) {
+        return text('No pending riffs. Click Riff on a card in the board to queue one.');
+      }
+      return text(
+        `Riffing on ${capsule.author}'s capsule (queued from the board). Build on this context:\n\n${renderCapsule(capsule)}`,
       );
     },
   };
