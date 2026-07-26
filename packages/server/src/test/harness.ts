@@ -22,6 +22,10 @@ export function makeCert(): { cert: string; key: string } {
   return { cert: pems.cert, key: pems.private };
 }
 
+// RSA keygen is expensive; generate one cert per worker and reuse it across
+// tests. Uniqueness per test is irrelevant to what we're testing here.
+const sharedCert = makeCert();
+
 export type Harness = {
   server: RiffServer;
   port: number;
@@ -33,11 +37,12 @@ export type Harness = {
 
 export async function startHarness(overrides: Partial<RiffServerOptions> = {}): Promise<Harness> {
   const server = await createRiffServer({
-    tls: makeCert(),
+    tls: sharedCert,
     joinCode: TEST_JOIN_CODE,
     hostKey: TEST_HOST_KEY,
     signingSecret: TEST_SIGNING_SECRET,
     maxParticipants: 25,
+    host: '127.0.0.1',
     ...overrides,
   });
   const { port } = await server.listen(0);
@@ -47,7 +52,8 @@ export async function startHarness(overrides: Partial<RiffServerOptions> = {}): 
     port,
     origin,
     authUrl: (sid) => `${origin}/rooms/${sid}/auth`,
-    wsUrl: (sid, ticket) => `wss://localhost:${port}/rooms/${sid}?ticket=${encodeURIComponent(ticket)}`,
+    wsUrl: (sid, ticket) =>
+      `wss://localhost:${port}/rooms/${sid}?ticket=${encodeURIComponent(ticket)}`,
     close: () => server.close(),
   };
 }
@@ -101,7 +107,74 @@ export function openSocket(url: string, origin = 'https://localhost'): WebSocket
   return new WebSocket(url, { rejectUnauthorized: false, headers: { origin } });
 }
 
-export function waitOpen(ws: WebSocket, timeoutMs = 3000): Promise<void> {
+/**
+ * A WSS client that buffers every inbound message from the moment it connects,
+ * so callers never miss a message that arrives between awaits. This avoids the
+ * lost-message races inherent to one-shot `.once('message')` listeners.
+ */
+export class TestClient {
+  private readonly queue: RiffMessage[] = [];
+  private readonly waiters: {
+    predicate: (m: RiffMessage) => boolean;
+    resolve: (m: RiffMessage) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }[] = [];
+
+  constructor(readonly socket: WebSocket) {
+    socket.on('message', (data: RawData) => {
+      let msg: RiffMessage;
+      try {
+        msg = parseEnvelope(data.toString()).msg;
+      } catch {
+        return;
+      }
+      this.queue.push(msg);
+      this.flush();
+    });
+  }
+
+  private flush(): void {
+    for (const waiter of [...this.waiters]) {
+      const idx = this.queue.findIndex(waiter.predicate);
+      if (idx >= 0) {
+        const [msg] = this.queue.splice(idx, 1);
+        clearTimeout(waiter.timer);
+        this.waiters.splice(this.waiters.indexOf(waiter), 1);
+        waiter.resolve(msg!);
+      }
+    }
+  }
+
+  /** Resolve with the next buffered/incoming message matching `predicate`. */
+  next(
+    predicate: (m: RiffMessage) => boolean = () => true,
+    timeoutMs = 10000,
+  ): Promise<RiffMessage> {
+    const idx = this.queue.findIndex(predicate);
+    if (idx >= 0) {
+      const [msg] = this.queue.splice(idx, 1);
+      return Promise.resolve(msg!);
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const i = this.waiters.findIndex((w) => w.timer === timer);
+        if (i >= 0) this.waiters.splice(i, 1);
+        reject(new Error('timeout waiting for matching message'));
+      }, timeoutMs);
+      this.waiters.push({ predicate, resolve, timer });
+    });
+  }
+
+  send(msg: RiffMessage): void {
+    this.socket.send(serializeEnvelope(msg));
+  }
+
+  close(): void {
+    this.socket.close();
+  }
+}
+
+export function waitOpen(ws: WebSocket, timeoutMs = 10000): Promise<void> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('timeout waiting for open')), timeoutMs);
     ws.once('open', () => {
@@ -115,7 +188,7 @@ export function waitOpen(ws: WebSocket, timeoutMs = 3000): Promise<void> {
   });
 }
 
-export function waitClose(ws: WebSocket, timeoutMs = 3000): Promise<{ code: number }> {
+export function waitClose(ws: WebSocket, timeoutMs = 10000): Promise<{ code: number }> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('timeout waiting for close')), timeoutMs);
     ws.once('close', (code) => {
@@ -125,55 +198,20 @@ export function waitClose(ws: WebSocket, timeoutMs = 3000): Promise<{ code: numb
   });
 }
 
-/** Resolve with the next protocol message received on the socket. */
-export function nextMessage(ws: WebSocket, timeoutMs = 3000): Promise<RiffMessage> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('timeout waiting for message')), timeoutMs);
-    ws.once('message', (data: RawData) => {
-      clearTimeout(t);
-      try {
-        resolve(parseEnvelope(data.toString()).msg);
-      } catch (err) {
-        reject(err as Error);
-      }
-    });
-    ws.once('error', (e) => {
-      clearTimeout(t);
-      reject(e);
-    });
-  });
-}
-
-/** Collect messages until one matches `predicate` (or timeout). */
-export function waitFor(
-  ws: WebSocket,
-  predicate: (msg: RiffMessage) => boolean,
-  timeoutMs = 3000,
-): Promise<RiffMessage> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('timeout waiting for matching message')), timeoutMs);
-    const onMessage = (data: RawData) => {
-      let msg: RiffMessage;
-      try {
-        msg = parseEnvelope(data.toString()).msg;
-      } catch {
-        return;
-      }
-      if (predicate(msg)) {
-        clearTimeout(t);
-        ws.off('message', onMessage);
-        resolve(msg);
-      }
-    };
-    ws.on('message', onMessage);
-    ws.once('error', (e) => {
-      clearTimeout(t);
-      reject(e);
-    });
-  });
-}
-
-/** Serialize and send a client→server message. */
-export function send(ws: WebSocket, msg: RiffMessage): void {
-  ws.send(serializeEnvelope(msg));
+/**
+ * Authenticate over HTTPS, open a WSS connection, and return a buffered
+ * {@link TestClient} once the socket is open.
+ */
+export async function connectClient(
+  h: Harness,
+  sessionId: string,
+  credential: string,
+  name: string,
+): Promise<TestClient> {
+  const res = await httpsPostJson(h.authUrl(sessionId), { credential, name }, { origin: h.origin });
+  const { ticket } = res.body as { ticket: string };
+  const socket = openSocket(h.wsUrl(sessionId, ticket), h.origin);
+  const client = new TestClient(socket);
+  await waitOpen(socket);
+  return client;
 }

@@ -1,8 +1,11 @@
 export { createRiffServer } from './server.js';
 export type { RiffServerOptions, RiffServer } from './server.js';
 
-export { SessionStore, RoomFullError } from './sessionStore.js';
+export { SessionStore, RoomFullError, OwnershipError } from './sessionStore.js';
 export type { SessionSnapshot } from './sessionStore.js';
+
+export { DEFAULT_LIMITS } from './config.js';
+export type { RiffLimits } from './config.js';
 
 export { TokenBucket } from './rateLimiter.js';
 

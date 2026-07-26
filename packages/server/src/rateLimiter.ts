@@ -8,20 +8,31 @@ export class TokenBucket {
    * @param capacity   Maximum tokens (burst size).
    * @param refillPerMs Tokens replenished per millisecond.
    */
+  private tokens: number;
+  private lastRefill: number | undefined;
+
   constructor(
     readonly capacity: number,
     readonly refillPerMs: number,
   ) {
-    void this.capacity;
-    void this.refillPerMs;
+    this.tokens = capacity;
   }
 
   /**
    * Attempt to remove `count` tokens at time `now` (unix ms), refilling based on
    * elapsed time since the last call. Returns true if the tokens were available.
    */
-  tryRemove(_now: number, _count = 1): boolean {
-    // TODO(#2): implement.
-    throw new Error('TokenBucket.tryRemove is not implemented yet (#2)');
+  tryRemove(now: number, count = 1): boolean {
+    if (this.lastRefill !== undefined) {
+      const elapsed = Math.max(0, now - this.lastRefill);
+      this.tokens = Math.min(this.capacity, this.tokens + elapsed * this.refillPerMs);
+    }
+    this.lastRefill = now;
+
+    if (this.tokens >= count) {
+      this.tokens -= count;
+      return true;
+    }
+    return false;
   }
 }

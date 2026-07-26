@@ -3,6 +3,7 @@
  * successful join. The WebSocket connection presents a ticket instead of the
  * join code, so the socket is never the authentication surface.
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /** The claims carried by a signed ticket. */
 export type TicketClaims = {
@@ -12,6 +13,8 @@ export type TicketClaims = {
   pid: string;
   /** Server-assigned role. */
   role: 'host' | 'guest';
+  /** Display name captured at auth (tamper-proof inside the signed ticket). */
+  name?: string;
   /** Expiry, unix ms. */
   exp: number;
 };
@@ -27,10 +30,14 @@ export class TicketError extends Error {
   }
 }
 
+function sign(payload: string, secret: Buffer): string {
+  return createHmac('sha256', secret).update(payload).digest('base64url');
+}
+
 /** Sign claims into a compact `<payload>.<signature>` token. */
-export function signTicket(_claims: TicketClaims, _secret: Buffer): string {
-  // TODO(#2): implement.
-  throw new Error('signTicket is not implemented yet (#2)');
+export function signTicket(claims: TicketClaims, secret: Buffer): string {
+  const payload = Buffer.from(JSON.stringify(claims), 'utf8').toString('base64url');
+  return `${payload}.${sign(payload, secret)}`;
 }
 
 /**
@@ -39,10 +46,36 @@ export function signTicket(_claims: TicketClaims, _secret: Buffer): string {
  * `expectedSessionId` is provided.
  */
 export function verifyTicket(
-  _token: string,
-  _secret: Buffer,
-  _opts: { now: number; expectedSessionId?: string },
+  token: string,
+  secret: Buffer,
+  opts: { now: number; expectedSessionId?: string },
 ): TicketClaims {
-  // TODO(#2): implement.
-  throw new Error('verifyTicket is not implemented yet (#2)');
+  const dot = token.indexOf('.');
+  if (dot <= 0 || dot !== token.lastIndexOf('.')) {
+    throw new TicketError('Malformed ticket', 'malformed');
+  }
+  const payload = token.slice(0, dot);
+  const signature = token.slice(dot + 1);
+
+  const expected = sign(payload, secret);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    throw new TicketError('Bad ticket signature', 'bad_signature');
+  }
+
+  let claims: TicketClaims;
+  try {
+    claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as TicketClaims;
+  } catch {
+    throw new TicketError('Malformed ticket payload', 'malformed');
+  }
+
+  if (claims.exp <= opts.now) {
+    throw new TicketError('Ticket expired', 'expired');
+  }
+  if (opts.expectedSessionId !== undefined && claims.sid !== opts.expectedSessionId) {
+    throw new TicketError('Ticket session mismatch', 'session_mismatch');
+  }
+  return claims;
 }
