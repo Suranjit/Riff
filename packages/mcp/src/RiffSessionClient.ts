@@ -6,6 +6,7 @@ import { WebSocket } from 'ws';
 import { createCapsule, parseEnvelope, serializeEnvelope, type ContextCapsule } from '@riff/shared';
 import { fingerprintsMatch } from './fingerprint.js';
 import { readAndClearPendingRiff, writePendingRiff } from './pendingRiffStore.js';
+import { recordPush } from './autoPushStore.js';
 
 /** Fields Claude provides when publishing a capsule. */
 export type PushFields = {
@@ -38,6 +39,8 @@ export type RiffSessionClientOptions = {
   insecure?: boolean;
   /** File shared with the UserPromptSubmit hook for pending riffs. */
   stateFile?: string;
+  /** File shared with the Stop hook to debounce auto-push nudges. */
+  autoPushFile?: string;
   now?: () => number;
   newId?: () => string;
 };
@@ -183,6 +186,7 @@ export class RiffSessionClient implements RiffSessionClientLike {
     this.pendingLineage = undefined;
     this.capsules.set(capsule.id, capsule);
     this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule }));
+    if (this.opts.autoPushFile) recordPush(this.opts.autoPushFile, this.now());
     return capsule;
   }
 
