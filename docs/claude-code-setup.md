@@ -70,3 +70,24 @@ add a `UserPromptSubmit` hook that runs `riff-hook`. It reads the same
 With the hook installed: click Riff on a card in the browser, switch to Claude
 Code, and just keep typing — the teammate's context is already there. Without it,
 call the `get_pending_riff` tool (or say "riff on it") to pull the queued context.
+
+## 4. (Optional) auto-push your capsule
+
+So your card refreshes roughly every minute without manual `push_capsule` calls,
+add a `Stop` hook that runs `riff-autopush`. When enough time has passed it nudges
+Claude to push a fresh summary (debounced so it never loops):
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "riff-autopush" }]
+      }
+    ]
+  }
+}
+```
+
+Tune the cadence with `RIFF_AUTOPUSH_INTERVAL_MS` (default `60000`). This costs at
+most one extra turn per interval while you're actively working.

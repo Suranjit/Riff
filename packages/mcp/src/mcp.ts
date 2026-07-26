@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { RiffSessionClient } from './RiffSessionClient.js';
 import { createMcpServer } from './server.js';
 import { defaultStateFile } from './hook.js';
+import { defaultAutoPushFile } from './autoPush.js';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -22,6 +23,7 @@ async function main(): Promise<void> {
     fingerprint: process.env.RIFF_FINGERPRINT,
     insecure: process.env.RIFF_INSECURE === '1',
     stateFile: defaultStateFile(),
+    autoPushFile: defaultAutoPushFile(),
   });
 
   // Logs go to stderr so they don't corrupt the stdio MCP protocol on stdout.

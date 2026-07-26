@@ -7,7 +7,8 @@
   "type": "module",
   "bin": {
     "riff-mcp": "./dist/mcp.js",
-    "riff-hook": "./dist/riff-hook.js"
+    "riff-hook": "./dist/riff-hook.js",
+    "riff-autopush": "./dist/riff-autopush.js"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
