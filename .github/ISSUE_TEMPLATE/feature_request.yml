@@ -1,7 +1,7 @@
-name: "✨ Feature / Ticket"
-description: "Propose and design a feature before implementation (the Riff way)."
-title: "feat: <concise feature title>"
-labels: ["enhancement", "needs-triage"]
+name: '✨ Feature / Ticket'
+description: 'Propose and design a feature before implementation (the Riff way).'
+title: 'feat: <concise feature title>'
+labels: ['enhancement', 'needs-triage']
 body:
   - type: markdown
     attributes:
