@@ -15,6 +15,7 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | 0001 | [Context Capsule schema & wire protocol](./0001-context-capsule-schema.md) | ✅ Done      |
 | 0002 | [riff-server — authenticated, encrypted local session host](./0002-riff-server.md) | ✅ Done      |
 | 0003 | [board UI — live capsule grid and the Riff action](./0003-board-ui.md) | ✅ Done      |
+| 0012 | [`riff start` — one command to host a session](./0012-riff-start-cli.md) | 🚧 In progress |
 
 ## Conventions
 
