@@ -20,6 +20,7 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | 0006 | [MCP plugin — publish and riff on capsules from Claude Code](./0006-mcp-plugin.md) | ✅ Done      |
 | 0009 | [Riff-button routing — click in the browser, auto-riff in Claude Code](./0009-riff-button-routing.md) | ✅ Done      |
 | 0008 | [auto-push — keep your capsule fresh via a Stop hook](./0008-auto-push.md) | ✅ Done      |
+| 0014 | [launch polish — production-quality UI, README, and repo hygiene](./0014-launch-polish.md) | ✅ Done      |
 
 ## Conventions
 

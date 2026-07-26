@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans;
+    /* The studio wall: a faint dot grid over warm paper. */
+    background-image: radial-gradient(circle, rgba(28, 25, 23, 0.06) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+
+  ::selection {
+    @apply bg-accent-tint text-accent-strong;
+  }
+}

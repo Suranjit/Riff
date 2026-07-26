@@ -1,4 +1,6 @@
 import type { ContextCapsule } from '@riff/shared';
+import { timeAgo } from '../lib/format.js';
+import { Avatar } from './Avatar.js';
 
 export type CapsuleCardProps = {
   capsule: ContextCapsule;
@@ -14,14 +16,21 @@ export type CapsuleCardProps = {
   index?: number;
 };
 
-function List({ title, items }: { title: string; items: string[] }): JSX.Element | null {
+function Section({ label, items, marker }: { label: string; items: string[]; marker: string }) {
   if (items.length === 0) return null;
   return (
-    <div className="mt-3">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</h4>
-      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-700">
+    <div className="mt-4">
+      <h4 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+        {label}
+      </h4>
+      <ul className="mt-1.5 space-y-1.5">
         {items.map((item, i) => (
-          <li key={i}>{item}</li>
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-ink-soft">
+            <span aria-hidden className="mt-[2px] shrink-0 text-accent">
+              {marker}
+            </span>
+            {item}
+          </li>
         ))}
       </ul>
     </div>
@@ -33,34 +42,52 @@ export function CapsuleCard({
   lineageLabel,
   isOwn,
   onRiff,
+  nowMs,
+  index = 0,
 }: CapsuleCardProps): JSX.Element {
+  const updated = timeAgo(capsule.updatedAt, nowMs ?? Date.now());
   return (
-    <article className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <header className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-semibold text-slate-900">{capsule.objective}</h3>
-          {lineageLabel ? (
-            <span className="mt-1 inline-block rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-              {lineageLabel}
-            </span>
-          ) : null}
+    <article
+      className="group flex animate-fade-up flex-col rounded-2xl border border-stone-200/80 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover"
+      style={{ animationDelay: `${Math.min(index, 8) * 60}ms` }}
+    >
+      <header className="flex items-center gap-3">
+        <Avatar name={capsule.author} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink">
+            {capsule.author}
+            {isOwn ? <span className="ml-1.5 font-normal text-ink-faint">(you)</span> : null}
+          </p>
+          <p className="text-xs text-ink-faint">{updated}</p>
         </div>
-        <span className="shrink-0 text-xs text-slate-500">{capsule.author}</span>
+        {lineageLabel ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-tint px-2.5 py-1 text-[11px] font-medium text-accent-strong">
+            <span aria-hidden>↩</span>
+            <span>{lineageLabel}</span>
+          </span>
+        ) : null}
       </header>
 
-      {capsule.approach ? <p className="mt-2 text-sm text-slate-600">{capsule.approach}</p> : null}
+      <h3 className="mt-4 text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ink">
+        {capsule.objective}
+      </h3>
 
-      <List title="Key findings" items={capsule.keyFindings} />
-      <List title="Open questions" items={capsule.openQuestions} />
+      {capsule.approach ? (
+        <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{capsule.approach}</p>
+      ) : null}
 
-      <div className="mt-4 flex justify-end">
+      <Section label="Key findings" items={capsule.keyFindings} marker="—" />
+      <Section label="Open questions" items={capsule.openQuestions} marker="?" />
+
+      <div className="mt-5 flex flex-1 items-end justify-end">
         <button
           type="button"
           disabled={isOwn}
           onClick={() => onRiff(capsule)}
-          className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+          title={isOwn ? 'This is your capsule' : `Riff on ${capsule.author}'s thread`}
+          className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-accent-strong hover:shadow-pop active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:shadow-none"
         >
-          Riff
+          Riff ♪
         </button>
       </div>
     </article>

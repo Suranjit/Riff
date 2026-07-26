@@ -7,11 +7,11 @@
 _Turn a room full of people each talking to their own Claude into a single, shared jam session._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Status: Pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#project-status)
+[![Status: MVP complete](https://img.shields.io/badge/status-MVP%20complete%20·%20pre--release-blueviolet.svg)](#project-status)
 [![Built test-first](https://img.shields.io/badge/built-test--first-blue.svg)](./CONTRIBUTING.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-[Introduction](#introduction) · [How it works](#how-it-works) · [Installation](#installation) · [Quick start](#quick-start) · [Architecture](#architecture) · [Roadmap](#roadmap) · [Contributing](#contributing)
+[Introduction](#introduction) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Connect Claude Code](#connect-claude-code) · [Architecture](#architecture) · [Security](#security) · [Roadmap](#roadmap) · [Contributing](#contributing)
 
 </div>
 
@@ -26,28 +26,28 @@ promising thread, and can't hand a line of thinking from one person to another.
 One person ends up driving while the rest watch. The collective intelligence in the
 room goes to waste.
 
-**Riff fixes that.** It gives the room a shared board where each participant's Claude
+**Riff fixes that.** It gives the room a shared board. Each participant's Claude
 Code session publishes a compact **Context Capsule** — a live summary of what they're
 exploring, what they've found, and what's still open. Everyone sees everyone's capsules
-update in real time. When you spot a thread worth building on, you **Riff** on it: that
-person's context is pulled into _your_ Claude Code session so you can continue, challenge,
-or extend it. The board tracks the lineage — who riffed on whom — as the group's thinking
-evolves.
+update in real time. When you spot a thread worth building on, you **Riff** on it:
+that person's context lands in _your_ Claude Code session — no copy-paste, no manual
+handoff. The board tracks the lineage as the group's thinking evolves.
 
-Riff is **local-first** and **peer-to-peer**: one person runs `riff start`, everyone else
-opens a URL on the same network. No accounts, no cloud, no data leaving the room.
+Riff is **local-first**: one person runs `riff start`, everyone else opens a URL on
+the same network. No accounts, no cloud, no data leaving the room.
 
-> Riff is built for **live, in-person brainstorming** — not async ticket-driven
-> development. It's the whiteboard for the age of coding agents.
+### What works today
 
-### Why Riff?
-
-- 🎯 **Made for live meetings.** Optimized for a group in a room right now, not a backlog.
-- 🧠 **Claude Code native.** Capsules are published and consumed through an MCP plugin — no copy-paste.
-- 🔌 **Local-first & peer-to-peer.** Runs on your LAN. No accounts, no cloud, nothing leaves the room.
-- 🌱 **Riff on anything.** Fork a teammate's context into your own session in one click.
-- 🪢 **Lineage-aware.** The board remembers how ideas branched and merged.
-- 🛠️ **Zero-friction onboarding.** `npx riff start` on one machine; a browser tab for everyone else.
+- 🎯 **Live shared board** — every participant's capsule, updating in real time.
+- 🧠 **Claude Code native** — capsules publish and flow through an MCP plugin.
+- 🖱️ **One-click riffing** — click Riff in the browser; the context auto-injects
+  into your next Claude Code message via a hook. Lineage (“riffed from Ada”) is tracked.
+- ⏱️ **Auto-refresh** — a Stop hook nudges your Claude to update your capsule
+  about once a minute, so cards never go stale.
+- 🔐 **Secure by default** — TLS with fingerprint verification, join-code auth,
+  server-signed identity, rate limiting, and a [documented threat model](./docs/security/threat-model.md).
+- 🪢 **One identity per person** — your browser and your Claude Code count as a
+  single participant.
 
 ## How it works
 
@@ -56,7 +56,7 @@ opens a URL on the same network. No accounts, no cloud, no data leaving the room
                     │  Host laptop:  riff start      │
                     │  local server + shared board   │
                     └───────────────┬───────────────┘
-                        WebSocket (same Wi-Fi / LAN)
+                       WSS over TLS (same Wi-Fi / LAN)
               ┌──────────────────────┼──────────────────────┐
         ┌─────┴──────┐         ┌─────┴──────┐         ┌──────┴─────┐
         │ Browser    │         │ Browser    │         │ Browser    │
@@ -66,15 +66,18 @@ opens a URL on the same network. No accounts, no cloud, no data leaving the room
         └────────────┘         └────────────┘         └────────────┘
 ```
 
-1. **Host** runs `riff start`; Riff prints a join URL like `http://192.168.1.20:4747/room/abc123`.
-2. **Participants** open the URL in a browser and connect their Claude Code via the Riff MCP plugin.
-3. Each session **publishes a Context Capsule** — automatically about once a minute, or on demand.
-4. The **board** shows every capsule, live.
-5. Click **Riff** on any capsule to pull that context into your own Claude Code session and build on it.
+1. **Host** runs `riff start` — it prints a join URL, a join code, and the TLS
+   certificate fingerprint.
+2. **Participants** open the URL, verify the fingerprint, and enter the join code.
+3. Each person connects Claude Code via the **Riff MCP plugin**; capsules publish
+   automatically (or on demand with `push_capsule`).
+4. The **board** shows every thread live — who's exploring what, findings, open questions.
+5. Click **Riff** on any card: that context is queued for your Claude Code and
+   auto-injected on your next message.
 
 ### The Context Capsule
 
-The unit of sharing in Riff. A compact, structured snapshot of one person's line of thinking:
+The unit of sharing in Riff — a compact, structured snapshot of one person's thinking:
 
 | Field | Description |
 | --- | --- |
@@ -84,125 +87,121 @@ The unit of sharing in Riff. A compact, structured snapshot of one person's line
 | `openQuestions` | What's still unclear |
 | `riffedFrom` | The capsule this was forked from (lineage) |
 
-## Installation
+## Quick start
 
-> ⚠️ **Pre-alpha.** Riff is not yet published to npm and the commands below are the
-> _intended_ interface, not a working release. To follow development, build from source.
-
-### From source (contributors)
-
-**Prerequisites:** [Node.js](https://nodejs.org) ≥ 22 and [pnpm](https://pnpm.io) 9
-(via Corepack).
+> Riff is not yet published to npm — run it from source (a packaging pass is on
+> the roadmap). **Prerequisites:** [Node.js](https://nodejs.org) ≥ 22 and
+> [pnpm](https://pnpm.io) 9 (`corepack enable pnpm`).
 
 ```bash
 git clone https://github.com/<owner>/riff.git
 cd riff
-corepack enable pnpm
 pnpm install
-pnpm test        # run the full test suite
-pnpm typecheck   # type-check every package
+pnpm build                              # build the board
+
+# Host a session (add --demo to seed sample capsules)
+pnpm --filter @riff/cli start
 ```
 
-**Run it locally** (the board is real; publishing capsules from Claude Code is
-still in progress — use `--demo` to seed sample capsules):
+You'll see:
 
-```bash
-pnpm build                                   # build the board assets
-pnpm --filter @riff/cli start --demo         # start a host + serve the board
-# → open the printed https URL, accept the cert, enter the join code
+```
+  🎸 Riff session ready
+
+  → Open on your network:  https://192.168.1.20:4747/room/<sessionId>
+  → Join code:             RIFF-4F9K-2A7Q
+  → Verify fingerprint:    sha256:3f9a…
+
+  Share the join code with the room. Everyone opens the URL, checks the
+  fingerprint matches in their browser, and joins. Press Ctrl-C to stop.
 ```
 
-### Once released (planned)
+Everyone on the network opens the URL, accepts the certificate **after checking
+the fingerprint**, and joins with the code.
 
-```bash
-# Host a session
-npx riff start
+## Connect Claude Code
 
-# ...or install globally
-npm install -g riff
-riff start
-```
+Each participant connects their Claude Code with the Riff MCP plugin — that's what
+publishes capsules and receives riffs. Full setup (MCP config, the auto-inject
+hook, and the auto-push hook) is in
+**[docs/claude-code-setup.md](./docs/claude-code-setup.md)**.
 
-## Quick start
-
-> _Planned interface — tracked across the MVP tickets; not all commands work yet._
-
-```bash
-# 1. On the host machine, start a session
-$ riff start
-  ✔ Riff session ready
-  → Share this link on your network:  http://192.168.1.20:4747/room/abc123
-
-# 2. Everyone else opens that URL in a browser.
-
-# 3. Each participant connects Claude Code by adding the Riff MCP server
-#    (one-time setup, printed by `riff start`), then just uses Claude normally.
-#    Capsules publish automatically ~every minute, or on demand:
-#      "push my context to the board"
-
-# 4. See a thread worth building on? Click "Riff" on its card — that context
-#    lands in your Claude Code session, attributed to its author.
-```
+Tools the plugin exposes: `push_capsule` · `list_capsules` · `pull_capsule` · `get_pending_riff`.
 
 ## Architecture
 
-Riff is a [pnpm](https://pnpm.io) monorepo of small, single-purpose packages:
+A [pnpm](https://pnpm.io) monorepo of small, single-purpose packages — 199 tests,
+written before the code they specify:
 
 ```
 riff/
 ├── packages/
-│   ├── shared/   # Context Capsule types + WebSocket message schema (source of truth)
-│   ├── server/   # riff-server: local host, WebSocket, in-memory capsule store
-│   ├── ui/       # React board (Vite)
-│   ├── mcp/      # Claude Code MCP plugin (publish + consume capsules)
-│   └── cli/      # `riff` CLI (start / join / sync)
-├── docs/tickets/ # ticket drafts: design docs that become GitHub issues
+│   ├── shared/   # Context Capsule schema + versioned wire protocol (zod)
+│   ├── server/   # local host: TLS, join-code auth, signed tickets, WSS sync
+│   ├── ui/       # the board (React + Vite + Tailwind)
+│   ├── mcp/      # Claude Code plugin: tools + riff/auto-push hooks
+│   └── cli/      # `riff start`
+├── docs/
+│   ├── tickets/          # every feature's design doc (ticket-first workflow)
+│   ├── security/         # threat model
+│   └── claude-code-setup.md
 └── .github/      # issue & PR templates, CI
 ```
 
-**Design choices for the MVP** (deliberately kept small):
+**Deliberate MVP choices:** in-memory session state (nothing persisted), same-network
+only (no relay, no cloud), and a single source of truth for all wire types in
+`@riff/shared`.
 
-- **No database, no cloud.** Capsules live in memory on the host for the duration
-  of the session. Nothing is persisted or uploaded.
-- **Same-network only.** Communication is plain WebSocket over the LAN — no relay,
-  no tunneling, no accounts.
-- **Single source of truth.** All wire types and runtime validation live in
-  `@riff/shared`, using [zod](https://zod.dev) so schemas _are_ the types.
+## Security
+
+Same-network is not the same as trusted. Riff ships with:
+
+- **TLS everywhere** — self-signed cert with an out-of-band **SHA-256 fingerprint**
+  check (the MCP plugin pins it and fails closed).
+- **Join-code authentication** over HTTPS minting short-lived, HMAC-signed tickets;
+  identity and role are **server-assigned**, never client-claimed.
+- **A hardened socket** — payload caps, per-connection rate limiting, origin
+  allow-list, per-room capacity, schema validation on every frame.
+
+Details and limitations: [threat model](./docs/security/threat-model.md) ·
+[security policy](./SECURITY.md).
 
 ## Project status
 
-> **Pre-alpha and built in the open.** Riff is developed feature by feature,
-> **test-first**, one tracked ticket at a time. The MVP is not yet usable — follow
-> along in [issues](../../issues) and [`docs/tickets`](./docs/tickets) to see
-> what's being designed and built next. Interfaces in this README describe the
-> intended product and will change.
+> **MVP complete, pre-release.** Every core feature below is built and tested
+> (test-first, one ticket at a time — see [`docs/tickets`](./docs/tickets)).
+> Remaining before a first release: packaging for `npx riff start`, broader
+> real-world testing, and docs hardening. Expect rough edges.
 
 ## Roadmap
 
-**MVP (in progress)**
+**MVP — done**
 
-- [ ] `@riff/shared` — Context Capsule schema & WebSocket protocol
-- [ ] `riff-server` — local host, real-time capsule broadcast, presence
-- [ ] Board UI — live capsule grid, the **Riff** action
-- [ ] MCP plugin — publish & consume capsules from Claude Code
-- [ ] `riff` CLI — `start`, `join`, auto-sync
-- [ ] One-command onboarding — `npx riff start`
+- [x] `@riff/shared` — Context Capsule schema & versioned wire protocol
+- [x] `riff-server` — encrypted, authenticated host with real-time sync
+- [x] Board UI — live capsule grid, presence, connection state
+- [x] Shared identity — browser + Claude Code = one participant
+- [x] MCP plugin — publish & pull capsules from Claude Code
+- [x] Riff button → auto-inject into your Claude Code (hook)
+- [x] Auto-push — capsules refresh ~every minute (Stop hook)
+- [x] `riff start` — one command to host, with `--demo` seeding
 
-**Later**
+**Next**
 
-- Capsule lineage visualization (graph view)
-- Cross-network sessions (opt-in relay)
-- Additional agent adapters beyond Claude Code
-- Session export / recap
+- [ ] Packaging — `npx riff start` without a source checkout
+- [ ] Session recap / export when the meeting ends
+- [ ] Lineage graph view (who riffed on whom, visually)
+- [ ] Cross-network sessions (opt-in relay)
+- [ ] Additional agent adapters beyond Claude Code
 
 ## Contributing
 
-Riff is developed **test-first**, one tracked ticket at a time, with open-source
-conventions from day one: every change starts as a ticket, failing tests are
-written and reviewed before implementation, and branches/commits follow documented
-conventions. If you'd like to help, start with **[CONTRIBUTING.md](./CONTRIBUTING.md)**.
-
-Please also read our **[Code of Conduct](./CODE_OF_CONDUCT.md)**.
+Riff is developed **test-first, one tracked ticket at a time**: every change starts
+as a design-doc ticket, failing tests are written and reviewed before implementation,
+and branches/commits follow documented conventions. Start with
+**[CONTRIBUTING.md](./CONTRIBUTING.md)** and the ticket index in
+[`docs/tickets`](./docs/tickets). Please also read our
+**[Code of Conduct](./CODE_OF_CONDUCT.md)**.
 
 ## License
 
