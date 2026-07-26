@@ -38,4 +38,16 @@ describe('CapsuleCard', () => {
     render(<CapsuleCard capsule={capsule()} isOwn onRiff={() => {}} />);
     expect(screen.getByRole('button', { name: /riff/i })).toBeDisabled();
   });
+
+  it('shows how recently the capsule was updated', () => {
+    render(
+      <CapsuleCard
+        capsule={capsule({ updatedAt: 1_000 })}
+        nowMs={1_000 + 3 * 60_000}
+        isOwn={false}
+        onRiff={() => {}}
+      />,
+    );
+    expect(screen.getByText('3m ago')).toBeInTheDocument();
+  });
 });

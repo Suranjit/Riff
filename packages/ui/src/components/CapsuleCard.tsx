@@ -8,6 +8,10 @@ export type CapsuleCardProps = {
   isOwn: boolean;
   /** The seam where the eventual Claude Code handoff attaches. */
   onRiff: (capsule: ContextCapsule) => void;
+  /** Injectable clock for the relative timestamp (defaults to Date.now()). */
+  nowMs?: number;
+  /** Entrance-animation stagger index. */
+  index?: number;
 };
 
 function List({ title, items }: { title: string; items: string[] }): JSX.Element | null {
