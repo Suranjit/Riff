@@ -16,8 +16,8 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | 0002 | [riff-server — authenticated, encrypted local session host](./0002-riff-server.md) | ✅ Done      |
 | 0003 | [board UI — live capsule grid and the Riff action](./0003-board-ui.md) | ✅ Done      |
 | 0012 | [`riff start` — one command to host a session](./0012-riff-start-cli.md) | ✅ Done      |
-| 0013 | [shared participant identity across a person's devices](./0013-shared-participant-identity.md) | 🚧 In progress |
-| 0006 | [MCP plugin — publish and riff on capsules from Claude Code](./0006-mcp-plugin.md) | 📝 Drafted |
+| 0013 | [shared participant identity across a person's devices](./0013-shared-participant-identity.md) | ✅ Done      |
+| 0006 | [MCP plugin — publish and riff on capsules from Claude Code](./0006-mcp-plugin.md) | 🚧 In progress |
 
 ## Conventions
 
