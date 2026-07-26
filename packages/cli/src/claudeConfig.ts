@@ -1,11 +1,13 @@
 /**
  * One-time, idempotent registration of Riff in the user's Claude Code config:
  * the MCP server in `~/.claude.json` and the two hooks in
- * `~/.claude/settings.json`. Registered commands are static (`npx -y riffboard
- * …`) and read `~/.riff/session.json`, so they never need editing again.
+ * `~/.claude/settings.json`. Registered commands read `~/.riff/session.json`, so
+ * they never need editing again. The launcher (npx vs. local) is pluggable so
+ * the flow can be validated before publishing.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { hookCommand, npxLauncher, type Launcher } from './launcher.js';
 
 export type EnsureResult = {
   mcpAdded: boolean;
@@ -13,8 +15,10 @@ export type EnsureResult = {
   stopHookAdded: boolean;
 };
 
-type JsonObject = Record<string, unknown>;
+const HOOK_MARKER = '#riff-hook';
+const AUTOPUSH_MARKER = '#riff-autopush';
 
+type JsonObject = Record<string, unknown>;
 type HookEntry = { hooks: Array<{ type: string; command: string }> };
 
 function readJson(path: string): JsonObject {
@@ -32,25 +36,36 @@ function writeJson(path: string, value: JsonObject): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
-/** True if any hook entry in the list runs the given command marker. */
-function hasHook(entries: HookEntry[], marker: string): boolean {
+/** Whether any hook entry carries our marker. */
+function hasMarker(entries: HookEntry[], marker: string): boolean {
   return entries.some((entry) =>
     (entry.hooks ?? []).some((h) => typeof h.command === 'string' && h.command.includes(marker)),
   );
 }
 
+/** Drop any Riff-owned entries (identified by marker) so we can re-add current ones. */
+function stripMarked(entries: HookEntry[], marker: string): HookEntry[] {
+  return entries.filter(
+    (entry) => !(entry.hooks ?? []).some((h) => (h.command ?? '').includes(marker)),
+  );
+}
+
 /**
  * Merge the Riff MCP server + hooks into the Claude Code user config under
- * `homeDir`, preserving everything already there. Safe to run repeatedly.
+ * `homeDir`, preserving everything already there. Safe to run repeatedly; a
+ * different `launcher` replaces the Riff entries in place rather than
+ * duplicating them.
  */
-export function ensureClaudeConfig(homeDir: string): EnsureResult {
+export function ensureClaudeConfig(homeDir: string, launcher: Launcher = npxLauncher): EnsureResult {
   // --- MCP server in ~/.claude.json ---------------------------------------
   const claudeJsonPath = join(homeDir, '.claude.json');
   const claudeJson = readJson(claudeJsonPath);
   const servers = (claudeJson.mcpServers ?? {}) as JsonObject;
   const mcpAdded = servers.riff === undefined;
-  if (mcpAdded) {
-    servers.riff = { command: 'npx', args: ['-y', 'riffboard', 'mcp'] };
+  const desiredMcp = { command: launcher.command, args: [...launcher.argsPrefix, 'mcp'] };
+  const mcpChanged = JSON.stringify(servers.riff) !== JSON.stringify(desiredMcp);
+  if (mcpChanged) {
+    servers.riff = desiredMcp;
     claudeJson.mcpServers = servers;
     writeJson(claudeJsonPath, claudeJson);
   }
@@ -62,18 +77,23 @@ export function ensureClaudeConfig(homeDir: string): EnsureResult {
   const prompt = hooks.UserPromptSubmit ?? [];
   const stop = hooks.Stop ?? [];
 
-  const promptHookAdded = !hasHook(prompt, 'riffboard hook');
-  if (promptHookAdded) {
-    prompt.push({ hooks: [{ type: 'command', command: 'npx -y riffboard hook' }] });
-  }
-  const stopHookAdded = !hasHook(stop, 'riffboard autopush');
-  if (stopHookAdded) {
-    stop.push({ hooks: [{ type: 'command', command: 'npx -y riffboard autopush' }] });
-  }
+  const promptHookAdded = !hasMarker(prompt, HOOK_MARKER);
+  const stopHookAdded = !hasMarker(stop, AUTOPUSH_MARKER);
 
-  if (promptHookAdded || stopHookAdded) {
-    hooks.UserPromptSubmit = prompt;
-    hooks.Stop = stop;
+  const nextPrompt = [
+    ...stripMarked(prompt, HOOK_MARKER),
+    { hooks: [{ type: 'command', command: hookCommand(launcher, 'hook', HOOK_MARKER) }] },
+  ];
+  const nextStop = [
+    ...stripMarked(stop, AUTOPUSH_MARKER),
+    { hooks: [{ type: 'command', command: hookCommand(launcher, 'autopush', AUTOPUSH_MARKER) }] },
+  ];
+
+  const promptChanged = JSON.stringify(prompt) !== JSON.stringify(nextPrompt);
+  const stopChanged = JSON.stringify(stop) !== JSON.stringify(nextStop);
+  if (promptChanged || stopChanged) {
+    hooks.UserPromptSubmit = nextPrompt;
+    hooks.Stop = nextStop;
     settings.hooks = hooks;
     writeJson(settingsPath, settings);
   }
