@@ -2,6 +2,8 @@ export type BannerInfo = {
   url: string;
   joinCode: string;
   fingerprint: string;
+  /** Ready-to-paste `npx riffboard join "…"` command for Claude Code users. */
+  joinCommand?: string;
 };
 
 /** Render the human-facing startup banner printed by `riff start`. */
