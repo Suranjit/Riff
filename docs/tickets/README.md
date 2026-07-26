@@ -13,7 +13,7 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | #    | Ticket                                                     | Status      |
 | ---- | ---------------------------------------------------------- | ----------- |
 | 0001 | [Context Capsule schema & wire protocol](./0001-context-capsule-schema.md) | ✅ Done      |
-| 0002 | riff-server — local host, capsule store, real-time sync    | 📝 Drafting |
+| 0002 | [riff-server — authenticated, encrypted local session host](./0002-riff-server.md) | 🚧 In progress |
 
 ## Conventions
 
