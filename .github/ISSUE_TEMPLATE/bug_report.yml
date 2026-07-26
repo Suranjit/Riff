@@ -1,7 +1,7 @@
-name: "🐛 Bug report"
+name: '🐛 Bug report'
 description: "Report something that isn't working as intended."
-title: "fix: <concise bug title>"
-labels: ["bug", "needs-triage"]
+title: 'fix: <concise bug title>'
+labels: ['bug', 'needs-triage']
 body:
   - type: textarea
     id: what-happened
