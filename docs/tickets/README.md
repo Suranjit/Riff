@@ -18,7 +18,7 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | 0012 | [`riff start` — one command to host a session](./0012-riff-start-cli.md) | ✅ Done      |
 | 0013 | [shared participant identity across a person's devices](./0013-shared-participant-identity.md) | ✅ Done      |
 | 0006 | [MCP plugin — publish and riff on capsules from Claude Code](./0006-mcp-plugin.md) | ✅ Done      |
-| 0009 | [Riff-button routing — click in the browser, auto-riff in Claude Code](./0009-riff-button-routing.md) | 🚧 In progress |
+| 0009 | [Riff-button routing — click in the browser, auto-riff in Claude Code](./0009-riff-button-routing.md) | ✅ Done      |
 
 ## Conventions
 
