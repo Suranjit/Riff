@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RiffSessionClient } from './RiffSessionClient.js';
-import { eventually, FINGERPRINT, JOIN_CODE, startServer, type ServerHandle } from './test/harness.js';
+import {
+  eventually,
+  FINGERPRINT,
+  JOIN_CODE,
+  startServer,
+  type ServerHandle,
+} from './test/harness.js';
 
 describe('RiffSessionClient', () => {
   let h: ServerHandle;
@@ -45,6 +51,21 @@ describe('RiffSessionClient', () => {
     ).rejects.toThrow();
   });
 
+  it('rejects a wrong fingerprint even after a prior successful connection', async () => {
+    // A first good connection must not leave a pooled socket that a later
+    // bad-fingerprint connect could reuse to skip verification (MITM hole).
+    await connect('Ada', 'key-ada');
+    await expect(
+      RiffSessionClient.connect({
+        baseUrl: h.baseUrl,
+        sessionId: h.sessionId,
+        joinCode: JOIN_CODE,
+        name: 'Mallory',
+        fingerprint: `sha256:${'00'.repeat(32)}`,
+      }),
+    ).rejects.toThrow();
+  });
+
   it('rejects a wrong join code', async () => {
     await expect(
       RiffSessionClient.connect({
@@ -61,7 +82,9 @@ describe('RiffSessionClient', () => {
     const client = await connect('Ada', 'key-ada');
     client.pushCapsule({ objective: 'Explore the graph model', keyFindings: ['CRDTs?'] });
     await eventually(() =>
-      h.server.store.snapshot(h.sessionId).capsules.some((c) => c.objective === 'Explore the graph model'),
+      h.server.store
+        .snapshot(h.sessionId)
+        .capsules.some((c) => c.objective === 'Explore the graph model'),
     );
   });
 

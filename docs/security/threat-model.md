@@ -42,6 +42,8 @@ management are on the roadmap and out of scope here).
 | **Resource exhaustion via many joins** | Per-room capacity cap (`room_full`). |
 | **Malformed / hostile payloads** | Every frame parsed and validated by `@riff/shared` (zod); capsule size and shape are bounded. |
 | **Overwriting another participant's capsule** | Capsules are owned by their first publisher; others are rejected. |
+| **MITM against the MCP plugin** | The Claude Code plugin pins the host's cert **fingerprint** and fails closed (refuses to connect) when no fingerprint is configured. Pinning is enforced on both the HTTPS auth request (fresh socket, before the join code is sent) and the WSS upgrade. |
+| **Stealing a participant key** | The participant key links a person's devices (browser + Claude Code) into one identity. It is a **bearer secret**: anyone holding it can present as that person. It travels in the personal `?me=` link on the trusted LAN, behind the join code, and is ≥16 bytes of entropy. Acceptable for MVP; real per-user auth is future work. |
 
 ## Explicit non-goals (MVP)
 

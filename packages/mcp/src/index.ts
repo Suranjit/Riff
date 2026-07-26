@@ -6,4 +6,5 @@ export type {
 } from './RiffSessionClient.js';
 export { createTools } from './tools.js';
 export type { ToolHandlers, ToolResponse } from './tools.js';
+export { createMcpServer } from './server.js';
 export { normalizeFingerprint, fingerprintsMatch } from './fingerprint.js';
