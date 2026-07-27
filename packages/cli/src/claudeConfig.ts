@@ -56,7 +56,10 @@ function stripMarked(entries: HookEntry[], marker: string): HookEntry[] {
  * different `launcher` replaces the Riff entries in place rather than
  * duplicating them.
  */
-export function ensureClaudeConfig(homeDir: string, launcher: Launcher = npxLauncher): EnsureResult {
+export function ensureClaudeConfig(
+  homeDir: string,
+  launcher: Launcher = npxLauncher,
+): EnsureResult {
   // --- MCP server in ~/.claude.json ---------------------------------------
   const claudeJsonPath = join(homeDir, '.claude.json');
   const claudeJson = readJson(claudeJsonPath);

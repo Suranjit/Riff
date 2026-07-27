@@ -16,6 +16,7 @@ import {
 import { startSession } from './startSession.js';
 import { formatStartupBanner } from './formatStartupBanner.js';
 import { performJoin } from './join.js';
+import { localLauncher } from './launcher.js';
 import { readSessionFile, sessionFilePath } from './sessionFile.js';
 import { resolveSessionOptions } from './resolveSession.js';
 
@@ -91,17 +92,24 @@ program
   .command('join <link>')
   .description('Connect Claude Code to a Riff session (one-time setup, then paste per session).')
   .option('-n, --name <name>', 'your display name on the board')
-  .action((link: string, options: { name?: string }) => {
-    const result = performJoin({ link, name: options.name, homeDir: homedir() });
+  .option('--local', 'register this local build instead of npx (for testing before publishing)')
+  .action((link: string, options: { name?: string; local?: boolean }) => {
+    const launcher = options.local
+      ? localLauncher(fileURLToPath(import.meta.url), process.execPath)
+      : undefined;
+    const result = performJoin({ link, name: options.name, homeDir: homedir(), launcher });
     const firstTime = result.mcpAdded || result.promptHookAdded || result.stopHookAdded;
     console.log('');
     console.log(`  🎸 Joined as ${result.name}.`);
     console.log(`  → Your board:  ${result.boardUrl}`);
+    if (options.local) {
+      console.log('  → Local mode: Claude Code will launch this build directly.');
+    }
     if (firstTime) {
       console.log('');
       console.log('  Claude Code integration installed. Restart Claude Code once to load it.');
     } else {
-      console.log('  Claude Code already set up — you are ready to go.');
+      console.log('  Claude Code integration updated.');
     }
     console.log('');
   });
