@@ -2,8 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildJoinLink } from '@riff/shared';
 import { performJoin } from './join.js';
+import { localLauncher } from './launcher.js';
 import { readSessionFile, sessionFilePath } from './sessionFile.js';
 
 const BASE = {
@@ -56,6 +58,14 @@ describe('performJoin', () => {
     expect(result.mcpAdded).toBe(true);
     expect(result.promptHookAdded).toBe(true);
     expect(result.stopHookAdded).toBe(true);
+  });
+
+  it('installs a local launcher when one is provided', () => {
+    const link = buildJoinLink({ ...BASE, name: 'Ada' });
+    performJoin({ link, homeDir: home, launcher: localLauncher('/abs/cli.js', '/usr/bin/node') });
+    const claudeJson = readFileSync(join(home, '.claude.json'), 'utf8');
+    expect(claudeJson).toContain('/abs/cli.js');
+    expect(claudeJson).not.toContain('npx');
   });
 
   it('throws on a malformed link', () => {

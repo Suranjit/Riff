@@ -22,7 +22,7 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | 0008 | [auto-push — keep your capsule fresh via a Stop hook](./0008-auto-push.md) | ✅ Done      |
 | 0014 | [launch polish — production-quality UI, README, and repo hygiene](./0014-launch-polish.md) | ✅ Done      |
 | 0015 | [riffboard packaging + one-command join](./0015-one-command-join.md) | ✅ Done      |
-| 0016 | [`riff join --local` — test the full loop before publishing](./0016-local-launcher.md) | 🚧 In progress |
+| 0016 | [`riff join --local` — test the full loop before publishing](./0016-local-launcher.md) | ✅ Done      |
 
 ## Conventions
 

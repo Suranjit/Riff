@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { parseJoinLink } from '@riff/shared';
 import { ensureClaudeConfig, type EnsureResult } from './claudeConfig.js';
+import { npxLauncher, type Launcher } from './launcher.js';
 import { sessionFilePath, writeSessionFile } from './sessionFile.js';
 
 export type JoinOptions = {
@@ -15,6 +16,8 @@ export type JoinOptions = {
   generateKey?: () => string;
   /** OS username fallback (injectable for tests). */
   osUsername?: () => string;
+  /** Launcher for the registered integration (defaults to `npx -y riffboard`). */
+  launcher?: Launcher;
 };
 
 export type JoinResult = EnsureResult & {
@@ -45,7 +48,7 @@ export function performJoin(opts: JoinOptions): JoinResult {
     name,
   });
 
-  const ensured = ensureClaudeConfig(opts.homeDir);
+  const ensured = ensureClaudeConfig(opts.homeDir, opts.launcher ?? npxLauncher);
 
   return {
     ...ensured,

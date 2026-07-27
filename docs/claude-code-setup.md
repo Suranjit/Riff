@@ -48,6 +48,25 @@ editing again.
 - **Auto-push:** the `Stop` hook nudges Claude to refresh your capsule about once
   a minute (tune with `RIFF_AUTOPUSH_INTERVAL_MS`).
 
+## Testing locally before publishing
+
+`riffboard` isn't on npm yet, so `npx riffboard …` won't resolve. To exercise the
+full loop from a source checkout:
+
+```bash
+pnpm install && pnpm build          # builds the board + bundles the CLI
+
+# Host (binds 0.0.0.0 so the LAN address in the link is reachable):
+node packages/cli/dist/cli.js start --demo
+
+# Participant — register THIS local build instead of npx:
+node packages/cli/dist/cli.js join --local "<link from the banner>"
+```
+
+`--local` points the MCP server and hooks at the running `dist/cli.js` (via
+absolute paths), so Claude Code launches your local build with no published
+package. Re-running `join` (local or npx) replaces the Riff entries in place.
+
 ## Manual configuration (advanced)
 
 If you'd rather not use `riff join`, set the Riff MCP server up yourself and pass

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ensureClaudeConfig } from './claudeConfig.js';
+import { localLauncher } from './launcher.js';
 
 function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
@@ -70,5 +71,33 @@ describe('ensureClaudeConfig', () => {
     };
     expect(settings.model).toBe('opus');
     expect(settings.hooks.Stop).toHaveLength(2); // existing + ours
+  });
+
+  it('registers a local launcher pointing at the running CLI', () => {
+    ensureClaudeConfig(home, localLauncher('/abs/dist/cli.js', '/usr/bin/node'));
+
+    const claude = readJson(join(home, '.claude.json'));
+    const servers = claude.mcpServers as Record<string, { command: string; args: string[] }>;
+    expect(servers.riff?.command).toBe('/usr/bin/node');
+    expect(servers.riff?.args).toEqual(['/abs/dist/cli.js', 'mcp']);
+
+    const settings = JSON.stringify(readJson(join(home, '.claude', 'settings.json')));
+    expect(settings).toContain('/abs/dist/cli.js');
+  });
+
+  it('replaces the Riff entries in place when the launcher changes (no duplicates)', () => {
+    ensureClaudeConfig(home); // npx
+    ensureClaudeConfig(home, localLauncher('/abs/dist/cli.js', '/usr/bin/node')); // switch to local
+
+    const claude = readJson(join(home, '.claude.json'));
+    const servers = claude.mcpServers as Record<string, { command: string }>;
+    expect(servers.riff?.command).toBe('/usr/bin/node');
+
+    const settings = readJson(join(home, '.claude', 'settings.json')) as {
+      hooks: { UserPromptSubmit: unknown[]; Stop: unknown[] };
+    };
+    expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
+    expect(settings.hooks.Stop).toHaveLength(1);
+    expect(JSON.stringify(settings)).not.toContain('npx');
   });
 });
