@@ -6,13 +6,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { Command } from 'commander';
 import { buildJoinLink } from '@riff/shared';
-import {
-  runMcpServer,
-  runHook,
-  runAutoPushHook,
-  defaultAutoPushFile,
-  DEFAULT_AUTOPUSH_INTERVAL_MS,
-} from '@riff/mcp';
+import { runMcpServer, runHook } from '@riff/mcp';
 import { startSession } from './startSession.js';
 import { formatStartupBanner } from './formatStartupBanner.js';
 import { performJoin } from './join.js';
@@ -98,7 +92,7 @@ program
       ? localLauncher(fileURLToPath(import.meta.url), process.execPath)
       : undefined;
     const result = performJoin({ link, name: options.name, homeDir: homedir(), launcher });
-    const firstTime = result.mcpAdded || result.promptHookAdded || result.stopHookAdded;
+    const firstTime = result.mcpAdded || result.promptHookAdded;
     console.log('');
     console.log(`  🎸 Joined as ${result.name}.`);
     console.log(`  → Your board:  ${result.boardUrl}`);
@@ -147,19 +141,6 @@ program
   .action(() => {
     const injection = runHook();
     if (injection) process.stdout.write(injection);
-  });
-
-program
-  .command('autopush')
-  .description('(internal) Stop hook: nudge Claude to refresh its capsule.')
-  .action(() => {
-    const intervalMs = Number(
-      process.env.RIFF_AUTOPUSH_INTERVAL_MS ?? DEFAULT_AUTOPUSH_INTERVAL_MS,
-    );
-    const result = runAutoPushHook(defaultAutoPushFile(), Date.now(), intervalMs);
-    if (result.block) {
-      process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }));
-    }
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {

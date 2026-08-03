@@ -42,8 +42,6 @@ the same network. No accounts, no cloud, no data leaving the room.
 - 🧠 **Claude Code native** — capsules publish and flow through an MCP plugin.
 - 🖱️ **One-click riffing** — click Riff in the browser; the context auto-injects
   into your next Claude Code message via a hook. Lineage (“riffed from Ada”) is tracked.
-- ⏱️ **Auto-refresh** — a Stop hook nudges your Claude to update your capsule
-  about once a minute, so cards never go stale.
 - 🔐 **Secure by default** — TLS with fingerprint verification, join-code auth,
   server-signed identity, rate limiting, and a [documented threat model](./docs/security/threat-model.md).
 - 🪢 **One identity per person** — your browser and your Claude Code count as a
@@ -143,7 +141,7 @@ riff/
 │   ├── shared/   # Context Capsule schema + versioned wire protocol (zod)
 │   ├── server/   # local host: TLS, join-code auth, signed tickets, WSS sync
 │   ├── ui/       # the board (React + Vite + Tailwind)
-│   ├── mcp/      # Claude Code plugin: tools + riff/auto-push hooks
+│   ├── mcp/      # Claude Code plugin: tools + the riff-inject hook
 │   └── cli/      # the `riffboard` package: start / join / mcp / hooks
 ├── docs/
 │   ├── tickets/          # every feature's design doc (ticket-first workflow)
@@ -188,7 +186,7 @@ Details and limitations: [threat model](./docs/security/threat-model.md) ·
 - [x] Shared identity — browser + Claude Code = one participant
 - [x] MCP plugin — publish & pull capsules from Claude Code
 - [x] Riff button → auto-inject into your Claude Code (hook)
-- [x] Auto-push — capsules refresh ~every minute (Stop hook)
+- [x] Explicit publish — `push_capsule` puts your capsule on the board on request
 - [x] `riff start` — one command to host, with `--demo` seeding
 - [x] One-command join — `npx riffboard join` installs the Claude Code integration
 - [x] Packaging — bundled `riffboard` package, runnable via `npx`

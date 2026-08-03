@@ -16,9 +16,9 @@ describe('ensureClaudeConfig', () => {
   });
   afterEach(() => rmSync(home, { recursive: true, force: true }));
 
-  it('registers the MCP server and both hooks in a fresh home', () => {
+  it('registers the MCP server and the inject hook in a fresh home', () => {
     const result = ensureClaudeConfig(home);
-    expect(result).toEqual({ mcpAdded: true, promptHookAdded: true, stopHookAdded: true });
+    expect(result).toEqual({ mcpAdded: true, promptHookAdded: true });
 
     const claude = readJson(join(home, '.claude.json'));
     const servers = claude.mcpServers as Record<string, { command: string; args: string[] }>;
@@ -27,22 +27,27 @@ describe('ensureClaudeConfig', () => {
 
     const settings = JSON.stringify(readJson(join(home, '.claude', 'settings.json')));
     expect(settings).toContain('riffboard hook');
-    expect(settings).toContain('riffboard autopush');
+  });
+
+  it('does NOT register a Stop hook (no auto-push)', () => {
+    ensureClaudeConfig(home);
+    const settings = JSON.stringify(readJson(join(home, '.claude', 'settings.json')));
+    expect(settings).not.toContain('autopush');
+    expect(settings).not.toContain('Stop');
   });
 
   it('is idempotent — a second run adds nothing', () => {
     ensureClaudeConfig(home);
     const again = ensureClaudeConfig(home);
-    expect(again).toEqual({ mcpAdded: false, promptHookAdded: false, stopHookAdded: false });
+    expect(again).toEqual({ mcpAdded: false, promptHookAdded: false });
 
     const settings = readJson(join(home, '.claude', 'settings.json')) as {
-      hooks: { UserPromptSubmit: unknown[]; Stop: unknown[] };
+      hooks: { UserPromptSubmit: unknown[] };
     };
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
-    expect(settings.hooks.Stop).toHaveLength(1);
   });
 
-  it('preserves existing MCP servers and settings', () => {
+  it('preserves existing MCP servers and settings, including any Stop hooks', () => {
     writeFileSync(
       join(home, '.claude.json'),
       JSON.stringify({ theme: 'dark', mcpServers: { other: { command: 'other-cmd' } } }),
@@ -67,10 +72,12 @@ describe('ensureClaudeConfig', () => {
 
     const settings = readJson(join(home, '.claude', 'settings.json')) as {
       model: string;
-      hooks: { Stop: unknown[] };
+      hooks: { Stop: unknown[]; UserPromptSubmit: unknown[] };
     };
     expect(settings.model).toBe('opus');
-    expect(settings.hooks.Stop).toHaveLength(2); // existing + ours
+    // Our change never touches Stop hooks: the user's stays, and we add none.
+    expect(settings.hooks.Stop).toHaveLength(1);
+    expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
   });
 
   it('registers a local launcher pointing at the running CLI', () => {
@@ -85,7 +92,7 @@ describe('ensureClaudeConfig', () => {
     expect(settings).toContain('/abs/dist/cli.js');
   });
 
-  it('replaces the Riff entries in place when the launcher changes (no duplicates)', () => {
+  it('replaces the inject hook in place when the launcher changes (no duplicates)', () => {
     ensureClaudeConfig(home); // npx
     ensureClaudeConfig(home, localLauncher('/abs/dist/cli.js', '/usr/bin/node')); // switch to local
 
@@ -94,10 +101,9 @@ describe('ensureClaudeConfig', () => {
     expect(servers.riff?.command).toBe('/usr/bin/node');
 
     const settings = readJson(join(home, '.claude', 'settings.json')) as {
-      hooks: { UserPromptSubmit: unknown[]; Stop: unknown[] };
+      hooks: { UserPromptSubmit: unknown[] };
     };
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
-    expect(settings.hooks.Stop).toHaveLength(1);
     expect(JSON.stringify(settings)).not.toContain('npx');
   });
 });

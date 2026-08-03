@@ -1,9 +1,9 @@
 /**
  * One-time, idempotent registration of Riff in the user's Claude Code config:
- * the MCP server in `~/.claude.json` and the two hooks in
- * `~/.claude/settings.json`. Registered commands read `~/.riff/session.json`, so
- * they never need editing again. The launcher (npx vs. local) is pluggable so
- * the flow can be validated before publishing.
+ * the MCP server in `~/.claude.json` and the Riff-button auto-inject
+ * `UserPromptSubmit` hook in `~/.claude/settings.json`. Registered commands
+ * read `~/.riff/session.json`, so they never need editing again. The launcher
+ * (npx vs. local) is pluggable so the flow can be validated before publishing.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -12,11 +12,9 @@ import { hookCommand, npxLauncher, type Launcher } from './launcher.js';
 export type EnsureResult = {
   mcpAdded: boolean;
   promptHookAdded: boolean;
-  stopHookAdded: boolean;
 };
 
 const HOOK_MARKER = '#riff-hook';
-const AUTOPUSH_MARKER = '#riff-autopush';
 
 type JsonObject = Record<string, unknown>;
 type HookEntry = { hooks: Array<{ type: string; command: string }> };
@@ -51,9 +49,9 @@ function stripMarked(entries: HookEntry[], marker: string): HookEntry[] {
 }
 
 /**
- * Merge the Riff MCP server + hooks into the Claude Code user config under
- * `homeDir`, preserving everything already there. Safe to run repeatedly; a
- * different `launcher` replaces the Riff entries in place rather than
+ * Merge the Riff MCP server + auto-inject hook into the Claude Code user config
+ * under `homeDir`, preserving everything already there. Safe to run repeatedly;
+ * a different `launcher` replaces the Riff entries in place rather than
  * duplicating them.
  */
 export function ensureClaudeConfig(
@@ -73,33 +71,23 @@ export function ensureClaudeConfig(
     writeJson(claudeJsonPath, claudeJson);
   }
 
-  // --- Hooks in ~/.claude/settings.json -----------------------------------
+  // --- UserPromptSubmit hook in ~/.claude/settings.json -------------------
   const settingsPath = join(homeDir, '.claude', 'settings.json');
   const settings = readJson(settingsPath);
   const hooks = (settings.hooks ?? {}) as Record<string, HookEntry[]>;
   const prompt = hooks.UserPromptSubmit ?? [];
-  const stop = hooks.Stop ?? [];
 
   const promptHookAdded = !hasMarker(prompt, HOOK_MARKER);
-  const stopHookAdded = !hasMarker(stop, AUTOPUSH_MARKER);
-
   const nextPrompt = [
     ...stripMarked(prompt, HOOK_MARKER),
     { hooks: [{ type: 'command', command: hookCommand(launcher, 'hook', HOOK_MARKER) }] },
   ];
-  const nextStop = [
-    ...stripMarked(stop, AUTOPUSH_MARKER),
-    { hooks: [{ type: 'command', command: hookCommand(launcher, 'autopush', AUTOPUSH_MARKER) }] },
-  ];
 
-  const promptChanged = JSON.stringify(prompt) !== JSON.stringify(nextPrompt);
-  const stopChanged = JSON.stringify(stop) !== JSON.stringify(nextStop);
-  if (promptChanged || stopChanged) {
+  if (JSON.stringify(prompt) !== JSON.stringify(nextPrompt)) {
     hooks.UserPromptSubmit = nextPrompt;
-    hooks.Stop = nextStop;
     settings.hooks = hooks;
     writeJson(settingsPath, settings);
   }
 
-  return { mcpAdded, promptHookAdded, stopHookAdded };
+  return { mcpAdded, promptHookAdded };
 }

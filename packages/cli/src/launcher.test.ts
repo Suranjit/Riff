@@ -21,13 +21,9 @@ describe('hookCommand', () => {
   });
 
   it('quotes local paths so spaces survive', () => {
-    const cmd = hookCommand(
-      localLauncher('/a b/cli.js', '/usr/bin/node'),
-      'autopush',
-      '#riff-autopush',
-    );
-    expect(cmd).toContain('#riff-autopush');
-    expect(cmd).toContain('autopush');
+    const cmd = hookCommand(localLauncher('/a b/cli.js', '/usr/bin/node'), 'hook', '#riff-hook');
+    expect(cmd).toContain('#riff-hook');
+    expect(cmd).toContain('hook');
     expect(cmd).toContain('/a b/cli.js');
   });
 });

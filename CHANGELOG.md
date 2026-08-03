@@ -29,15 +29,16 @@ The complete MVP, built test-first one ticket at a time (design docs in
   editorial palette, avatars, relative timestamps, motion). (#3, #14)
 - **`@riff/mcp`** — the Claude Code plugin: `push_capsule`, `list_capsules`,
   `pull_capsule`, and `get_pending_riff` tools; certificate-fingerprint
-  pinning (fail-closed); pull→push lineage tracking; a `UserPromptSubmit`
-  hook that auto-injects a riffed capsule into your next message; and a
-  `Stop` hook that keeps your capsule fresh (~1 min, loop-safe). (#6, #9, #8)
+  pinning (fail-closed); pull→push lineage tracking; and a `UserPromptSubmit`
+  hook that auto-injects a riffed capsule into your next message. Capsules
+  publish only on explicit request — Riff never pushes on its own. (#6, #9)
 - **`riffboard` (the CLI package)** — `riff start` generates session secrets and
   certificate, starts the host, serves the board, detects the LAN address, and
   prints the join URL + code + fingerprint (`--demo` seeds sample capsules);
   `riff join "<link>"` sets up a participant's Claude Code in **one command**
   (writes `~/.riff/session.json` and idempotently registers the MCP server +
-  hooks at user scope); `riff mcp|hook|autopush` back the integration. The board
+  the inject hook at user scope); `riff mcp` and `riff hook` back the
+  integration. The board
   gained a **Connect Claude Code** button that copies a ready-to-paste command
   embedding the viewer's identity, and the server exposes `GET /meta` for the
   cert fingerprint. Bundled with tsup and verified to run standalone from an
