@@ -24,6 +24,7 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | 0015 | [riffboard packaging + one-command join](./0015-one-command-join.md) | ✅ Done      |
 | 0016 | [`riff join --local` — test the full loop before publishing](./0016-local-launcher.md) | ✅ Done      |
 | 0017 | [remove auto-push — publish only on explicit request](./0017-remove-auto-push.md) | ✅ Done      |
+| 0018 | [prepare riffboard for its first npm publish](./0018-npm-release-prep.md) | ✅ Done      |
 
 ## Conventions
 
