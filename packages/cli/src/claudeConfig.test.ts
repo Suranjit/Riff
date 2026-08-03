@@ -36,6 +36,32 @@ describe('ensureClaudeConfig', () => {
     expect(settings).not.toContain('Stop');
   });
 
+  it('cleans up a stale auto-push Stop hook it installed in a past version', () => {
+    mkdirSync(join(home, '.claude'), { recursive: true });
+    writeFileSync(
+      join(home, '.claude', 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          Stop: [
+            { hooks: [{ type: 'command', command: 'npx -y riffboard autopush #riff-autopush' }] },
+            { hooks: [{ type: 'command', command: 'my-own-stop-hook' }] },
+          ],
+        },
+      }),
+      'utf8',
+    );
+
+    ensureClaudeConfig(home);
+
+    const settings = readJson(join(home, '.claude', 'settings.json')) as {
+      hooks: { Stop: Array<{ hooks: Array<{ command: string }> }> };
+    };
+    // The stale Riff hook is gone; the user's own Stop hook survives.
+    expect(JSON.stringify(settings)).not.toContain('autopush');
+    expect(settings.hooks.Stop).toHaveLength(1);
+    expect(settings.hooks.Stop[0]?.hooks[0]?.command).toBe('my-own-stop-hook');
+  });
+
   it('is idempotent — a second run adds nothing', () => {
     ensureClaudeConfig(home);
     const again = ensureClaudeConfig(home);
