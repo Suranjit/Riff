@@ -4,10 +4,10 @@
   "description": "Real-time collaborative brainstorming with coding agents. Host a shared board and riff on each other's Claude Code sessions.",
   "license": "MIT",
   "author": "Suranjit Adhikari and Riff contributors",
-  "homepage": "https://github.com/suranjitadhikari/riff",
+  "homepage": "https://github.com/Suranjit/Riff",
   "repository": {
     "type": "git",
-    "url": "https://github.com/suranjitadhikari/riff.git"
+    "url": "https://github.com/Suranjit/Riff.git"
   },
   "keywords": [
     "claude",

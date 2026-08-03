@@ -42,7 +42,7 @@ Restart Claude Code once. That's it — your agent can now publish capsules and 
 ## Learn more
 
 Full docs, architecture, security model, and the Claude Code setup guide:
-<https://github.com/suranjitadhikari/riff>
+<https://github.com/Suranjit/Riff>
 
 ## License
 
