@@ -201,12 +201,17 @@ Details and limitations: [threat model](./docs/security/threat-model.md) ·
 
 ## Contributing
 
-Riff is developed **test-first, one tracked ticket at a time**: every change starts
-as a design-doc ticket, failing tests are written and reviewed before implementation,
-and branches/commits follow documented conventions. Start with
-**[CONTRIBUTING.md](./CONTRIBUTING.md)** and the ticket index in
-[`docs/tickets`](./docs/tickets). Please also read our
-**[Code of Conduct](./CODE_OF_CONDUCT.md)**.
+Contributions are welcome!
+
+1. **Open an issue** to report a bug or propose a feature — use the
+   [issue templates](./.github/ISSUE_TEMPLATE) so there's a place to discuss it first.
+2. **Fork and branch** off `main`.
+3. **Make your change** and run the checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`.
+4. **Open a pull request** against `main` referencing the issue; the
+   [PR template](./.github/PULL_REQUEST_TEMPLATE.md) walks you through the rest.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup details, and please be kind —
+we follow a [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## License
 
