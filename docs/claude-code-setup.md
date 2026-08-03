@@ -33,8 +33,7 @@ keep working — no restart needed after the first time.
 `riff join` writes, idempotently and without clobbering your existing config:
 
 - `~/.claude.json` → `mcpServers.riff = { command: "npx", args: ["-y", "riffboard", "mcp"] }`
-- `~/.claude/settings.json` → a `UserPromptSubmit` hook (`npx -y riffboard hook`)
-  and a `Stop` hook (`npx -y riffboard autopush`).
+- `~/.claude/settings.json` → a `UserPromptSubmit` hook (`npx -y riffboard hook`).
 
 These commands are static — they read `~/.riff/session.json`, so they never need
 editing again.
@@ -42,11 +41,11 @@ editing again.
 ## What you get
 
 - **Tools:** `push_capsule`, `list_capsules`, `pull_capsule`, `get_pending_riff`.
+- **Publish on request:** your capsule goes on the board only when you ask (e.g.
+  "push my context to the board" → `push_capsule`). Riff never publishes on its own.
 - **Riff button → your session:** click Riff on the board, then just keep typing
   in Claude Code — the `UserPromptSubmit` hook injects the capsule's context
   before your next message (no tool call, no copy-paste).
-- **Auto-push:** the `Stop` hook nudges Claude to refresh your capsule about once
-  a minute (tune with `RIFF_AUTOPUSH_INTERVAL_MS`).
 
 ## Testing locally before publishing
 

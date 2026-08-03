@@ -1,9 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RiffSessionClient } from './RiffSessionClient.js';
-import { readAutoPushState } from './autoPushStore.js';
 import {
   eventually,
   FINGERPRINT,
@@ -41,28 +37,6 @@ describe('RiffSessionClient', () => {
     const client = await connect('Ada', 'key-ada');
     expect(client.participantId).toBeTypeOf('string');
     expect(client.listCapsules()).toEqual([]);
-  });
-
-  it('records the push time in the auto-push file when configured', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'riff-ap-'));
-    const autoPushFile = join(dir, 'autopush.json');
-    try {
-      const client = await RiffSessionClient.connect({
-        baseUrl: h.baseUrl,
-        sessionId: h.sessionId,
-        joinCode: JOIN_CODE,
-        name: 'Ada',
-        participantKey: 'key-ada',
-        fingerprint: FINGERPRINT,
-        autoPushFile,
-        now: () => 123_456,
-      });
-      open.push(client);
-      client.pushCapsule({ objective: 'An objective' });
-      expect(readAutoPushState(autoPushFile).lastPushMs).toBe(123_456);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 
   it('rejects a wrong fingerprint', async () => {

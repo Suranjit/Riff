@@ -57,7 +57,6 @@ describe('performJoin', () => {
     const result = performJoin({ link: buildJoinLink({ ...BASE, name: 'Ada' }), homeDir: home });
     expect(result.mcpAdded).toBe(true);
     expect(result.promptHookAdded).toBe(true);
-    expect(result.stopHookAdded).toBe(true);
   });
 
   it('installs a local launcher when one is provided', () => {

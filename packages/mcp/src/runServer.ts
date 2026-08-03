@@ -2,7 +2,6 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { RiffSessionClient, type RiffSessionClientOptions } from './RiffSessionClient.js';
 import { createMcpServer } from './server.js';
 import { defaultStateFile } from './hook.js';
-import { defaultAutoPushFile } from './autoPush.js';
 
 /**
  * Connect to the Riff session and serve the MCP tools over stdio. Extracted so
@@ -11,7 +10,6 @@ import { defaultAutoPushFile } from './autoPush.js';
 export async function runMcpServer(options: RiffSessionClientOptions): Promise<void> {
   const client = await RiffSessionClient.connect({
     stateFile: defaultStateFile(),
-    autoPushFile: defaultAutoPushFile(),
     ...options,
   });
 
