@@ -23,7 +23,7 @@ See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full workflow.
 | 0014 | [launch polish — production-quality UI, README, and repo hygiene](./0014-launch-polish.md) | ✅ Done      |
 | 0015 | [riffboard packaging + one-command join](./0015-one-command-join.md) | ✅ Done      |
 | 0016 | [`riff join --local` — test the full loop before publishing](./0016-local-launcher.md) | ✅ Done      |
-| 0017 | [remove auto-push — publish only on explicit request](./0017-remove-auto-push.md) | 🚧 In progress |
+| 0017 | [remove auto-push — publish only on explicit request](./0017-remove-auto-push.md) | ✅ Done      |
 
 ## Conventions
 
