@@ -34,7 +34,7 @@
     "dev": "tsx src/cli.ts",
     "start": "tsx src/cli.ts start",
     "build": "tsup && node ./scripts/copy-board.mjs",
-    "prepack": "pnpm build",
+    "prepack": "pnpm --filter @riff/ui build && pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
