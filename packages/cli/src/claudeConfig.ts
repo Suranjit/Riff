@@ -15,6 +15,8 @@ export type EnsureResult = {
 };
 
 const HOOK_MARKER = '#riff-hook';
+// Marker from the removed auto-push feature; stripped on join for a clean migration.
+const STALE_AUTOPUSH_MARKER = '#riff-autopush';
 
 type JsonObject = Record<string, unknown>;
 type HookEntry = { hooks: Array<{ type: string; command: string }> };
@@ -83,8 +85,17 @@ export function ensureClaudeConfig(
     { hooks: [{ type: 'command', command: hookCommand(launcher, 'hook', HOOK_MARKER) }] },
   ];
 
-  if (JSON.stringify(prompt) !== JSON.stringify(nextPrompt)) {
+  // Migration: remove any stale auto-push Stop hook from a past version.
+  const stop = hooks.Stop ?? [];
+  const nextStop = stripMarked(stop, STALE_AUTOPUSH_MARKER);
+  const stopChanged = JSON.stringify(stop) !== JSON.stringify(nextStop);
+
+  if (JSON.stringify(prompt) !== JSON.stringify(nextPrompt) || stopChanged) {
     hooks.UserPromptSubmit = nextPrompt;
+    if (stopChanged) {
+      if (nextStop.length > 0) hooks.Stop = nextStop;
+      else delete hooks.Stop;
+    }
     settings.hooks = hooks;
     writeJson(settingsPath, settings);
   }
