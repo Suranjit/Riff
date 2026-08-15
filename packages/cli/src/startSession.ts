@@ -16,6 +16,8 @@ export type StartSessionOptions = {
   demo?: boolean;
   /** Injectable crypto for deterministic tests. */
   deps?: Partial<SessionDeps>;
+  /** Injectable clock, so demo seeding is deterministic in tests. */
+  now?: () => number;
   /** Override the advertised LAN address (else auto-detected). */
   lanAddress?: string;
 };
@@ -31,9 +33,12 @@ export type RunningSession = {
   close(): Promise<void>;
 };
 
-/** Sample capsules seeded by `--demo` so the board isn't empty in a demo. */
-function demoCapsules(sessionId: string): ContextCapsule[] {
-  const base = 1_700_000_000_000;
+/**
+ * Sample capsules seeded by `--demo` so the board isn't empty in a demo.
+ * `base` is the caller's clock: seeding from a fixed epoch would render every
+ * demo capsule as years old on the board.
+ */
+function demoCapsules(sessionId: string, base: number): ContextCapsule[] {
   const first = createCapsule({
     id: randomUUID(),
     sessionId,
@@ -75,7 +80,7 @@ export async function startSession(opts: StartSessionOptions = {}): Promise<Runn
   const { port } = await server.listen(opts.port ?? 4747);
 
   if (opts.demo) {
-    for (const capsule of demoCapsules(config.sessionId)) {
+    for (const capsule of demoCapsules(config.sessionId, (opts.now ?? Date.now)())) {
       server.store.upsertCapsule(config.sessionId, capsule);
     }
   }

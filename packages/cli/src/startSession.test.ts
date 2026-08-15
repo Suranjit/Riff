@@ -124,6 +124,25 @@ describe('startSession', () => {
     expect(snapshot.capsules.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('stamps demo capsules with the current time, not a fixed epoch', async () => {
+    const now = 1_800_000_000_000;
+    session = await startSession({
+      port: 0,
+      host: '127.0.0.1',
+      lanAddress: '127.0.0.1',
+      staticDir: dir,
+      demo: true,
+      now: () => now,
+      deps: deterministicDeps,
+    });
+    const { capsules } = session.server.store.snapshot(session.sessionId);
+    expect(capsules.length).toBeGreaterThanOrEqual(2);
+    for (const capsule of capsules) {
+      expect(capsule.createdAt).toBeGreaterThanOrEqual(now);
+      expect(capsule.createdAt).toBeLessThan(now + 60_000);
+    }
+  });
+
   it('does not seed capsules without --demo', async () => {
     session = await startSession({
       port: 0,
