@@ -4,8 +4,10 @@ import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import {
   capsuleDraftSchema,
+  createBackoff,
   parseEnvelope,
   serializeEnvelope,
+  type BackoffOptions,
   type CapsuleDraft,
   type ContextCapsule,
 } from '@riff/shared';
@@ -45,6 +47,10 @@ export type RiffSessionClientOptions = {
   stateFile?: string;
   now?: () => number;
   newId?: () => string;
+  /** Reconnect backoff (injectable so tests need no real waiting). */
+  backoff?: BackoffOptions;
+  /** Schedule a retry; injectable for deterministic tests. */
+  schedule?: (fn: () => void, ms: number) => () => void;
 };
 
 type AuthResponse = { ticket: string; participantId: string; role: string };
@@ -59,10 +65,15 @@ export class RiffSessionClient implements RiffSessionClientLike {
   private pendingLineage: string | undefined;
   private connected = true;
   private lastError: string | undefined;
+  private lastPublished: CapsuleDraft | undefined;
+  private closedByUser = false;
+  private cancelRetry: (() => void) | undefined;
+  private readonly backoff;
+  private readonly schedule: (fn: () => void, ms: number) => () => void;
 
   private constructor(
     private readonly opts: RiffSessionClientOptions,
-    private readonly socket: WebSocket,
+    private socket: WebSocket,
     readonly participantId: string,
     readonly participantKey: string,
     private readonly now: () => number,
@@ -77,6 +88,63 @@ export class RiffSessionClient implements RiffSessionClientLike {
     });
     socket.on('close', () => {
       this.connected = false;
+      this.scheduleReconnect();
+    });
+    this.backoff = createBackoff(opts.backoff);
+    this.schedule =
+      opts.schedule ??
+      ((fn, ms) => {
+        const t = setTimeout(fn, ms);
+        t.unref?.();
+        return () => clearTimeout(t);
+      });
+  }
+
+  /**
+   * Re-authenticate and re-open after a drop. A meeting tool that dies on one
+   * Wi-Fi blip is not usable, and the plugin has no UI in which to tell anyone.
+   */
+  private scheduleReconnect(): void {
+    if (this.closedByUser || this.cancelRetry) return;
+    this.cancelRetry = this.schedule(() => {
+      this.cancelRetry = undefined;
+      void this.reconnect();
+    }, this.backoff.next());
+  }
+
+  private async reconnect(): Promise<void> {
+    if (this.closedByUser) return;
+    try {
+      const socket = await openSession({ ...this.opts, participantKey: this.participantKey });
+      if (this.closedByUser) {
+        socket.close();
+        return;
+      }
+      this.socket = socket;
+      this.attach(socket);
+      await this.waitForReady();
+      this.connected = true;
+      this.backoff.reset();
+      // Re-publish so the board self-heals if the host restarted and lost state.
+      if (this.lastPublished) {
+        this.socket.send(
+          serializeEnvelope({ type: 'capsule:publish', capsule: this.lastPublished }),
+        );
+      }
+    } catch (err) {
+      this.lastError = (err as Error).message;
+      this.scheduleReconnect();
+    }
+  }
+
+  private attach(socket: WebSocket): void {
+    socket.on('message', (data: Buffer) => this.handleMessage(data.toString()));
+    socket.on('error', (err: Error) => {
+      this.lastError = err.message;
+    });
+    socket.on('close', () => {
+      this.connected = false;
+      this.scheduleReconnect();
     });
   }
 
@@ -101,17 +169,7 @@ export class RiffSessionClient implements RiffSessionClientLike {
       opts.fingerprint,
     );
 
-    const wsUrl = `${opts.baseUrl.replace(/^http/, 'ws')}/rooms/${opts.sessionId}?ticket=${encodeURIComponent(
-      auth.ticket,
-    )}`;
-    // The ticket travels in the request line, so the certificate must be
-    // verified before a single byte is written. Checking on ws's 'upgrade'
-    // event is too late — by then the ticket has already been sent to whoever
-    // answered. So we complete the TLS handshake ourselves, verify the
-    // fingerprint, and only then hand the already-verified socket to ws.
-    const socket = new WebSocket(wsUrl, {
-      agent: await verifiedAgent(wsUrl, opts.fingerprint),
-    });
+    const socket = await openSocketFor(opts, auth.ticket);
 
     const client = new RiffSessionClient(
       opts,
@@ -209,6 +267,7 @@ export class RiffSessionClient implements RiffSessionClientLike {
     this.pendingLineage = undefined;
     this.requireOpen();
     this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule: draft }));
+    this.lastPublished = draft;
     return draft;
   }
 
@@ -238,6 +297,9 @@ export class RiffSessionClient implements RiffSessionClientLike {
   }
 
   close(): void {
+    this.closedByUser = true;
+    this.cancelRetry?.();
+    this.cancelRetry = undefined;
     this.socket.close();
   }
 }
@@ -318,4 +380,33 @@ async function verifiedAgent(urlStr: string, fingerprint?: string): Promise<http
   // an unverified one of its own.
   (agent as unknown as { createConnection: () => TLSSocket }).createConnection = () => socket;
   return agent;
+}
+
+/**
+ * Authenticate and open a verified socket. Shared by the first connection and
+ * every reconnect, so both get identical certificate guarantees.
+ */
+async function openSession(opts: RiffSessionClientOptions): Promise<WebSocket> {
+  const auth = await httpsPostJson(
+    `${opts.baseUrl}/rooms/${opts.sessionId}/auth`,
+    {
+      credential: opts.joinCode,
+      name: opts.name,
+      participantKey: opts.participantKey,
+    },
+    opts.fingerprint,
+  );
+  return openSocketFor(opts, auth.ticket);
+}
+
+/**
+ * Open the session socket.
+ *
+ * The ticket travels in the request line, so the certificate must be verified
+ * before a single byte is written. Checking on ws's 'upgrade' event is too late:
+ * by then the ticket has already gone to whoever answered.
+ */
+async function openSocketFor(opts: RiffSessionClientOptions, ticket: string): Promise<WebSocket> {
+  const wsUrl = `${opts.baseUrl.replace(/^http/, 'ws')}/rooms/${opts.sessionId}?ticket=${encodeURIComponent(ticket)}`;
+  return new WebSocket(wsUrl, { agent: await verifiedAgent(wsUrl, opts.fingerprint) });
 }

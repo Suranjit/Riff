@@ -6,6 +6,9 @@ export {
   createCapsule,
 } from './capsule.js';
 
+export type { Backoff, BackoffOptions } from './backoff.js';
+export { createBackoff } from './backoff.js';
+
 export type { JoinLink } from './joinLink.js';
 export { buildJoinLink, parseJoinLink, JoinLinkError } from './joinLink.js';
 
