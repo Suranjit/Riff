@@ -359,9 +359,17 @@ async function httpsPostJson(
 async function verifiedAgent(urlStr: string, fingerprint?: string): Promise<https.Agent> {
   const u = new URL(urlStr);
   const port = Number(u.port || 443);
+  // SNI must not be an IP address (RFC 6066), and Riff hosts are reached by IP
+  // on a LAN — setting it anyway logs a deprecation warning on every connection.
+  const isIpHost = /^[\d.]+$/.test(u.hostname) || u.hostname.includes(':');
   const socket = await new Promise<TLSSocket>((resolve, reject) => {
     const s = tls.connect(
-      { host: u.hostname, port, servername: u.hostname, rejectUnauthorized: false },
+      {
+        host: u.hostname,
+        port,
+        ...(isIpHost ? {} : { servername: u.hostname }),
+        rejectUnauthorized: false,
+      },
       () => resolve(s),
     );
     s.once('error', reject);
