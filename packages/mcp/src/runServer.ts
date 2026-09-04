@@ -5,11 +5,11 @@ import { defaultStateFile } from './hook.js';
 
 /**
  * Connect to the Riff session and serve the MCP tools over stdio. Extracted so
- * both the standalone `riff-mcp` bin and the `riff mcp` subcommand can drive it.
+ * the `riff mcp` subcommand can drive it.
  */
 export async function runMcpServer(options: RiffSessionClientOptions): Promise<void> {
   const client = await RiffSessionClient.connect({
-    stateFile: defaultStateFile(options.sessionId, options.participantKey),
+    stateFile: defaultStateFile(options.sessionId, options.participantKey ?? options.name),
     ...options,
   });
 

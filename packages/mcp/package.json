@@ -2,13 +2,9 @@
   "name": "@riff/mcp",
   "version": "0.0.0",
   "private": true,
-  "description": "Riff MCP plugin — publish and riff on capsules from Claude Code.",
+  "description": "Riff MCP plugin \u2014 publish and riff on capsules from Claude Code.",
   "license": "MIT",
   "type": "module",
-  "bin": {
-    "riff-mcp": "./dist/mcp.js",
-    "riff-hook": "./dist/riff-hook.js"
-  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {

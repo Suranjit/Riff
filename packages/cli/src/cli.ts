@@ -163,9 +163,12 @@ program
   .command('hook')
   .description('(internal) UserPromptSubmit hook: inject a queued riff.')
   .action(() => {
-    // Derive the same per-identity path the plugin writes to.
+    // Derive the same per-identity path the plugin writes to. With no session
+    // configured there is nothing to inject — stay silent rather than guess a
+    // path and read someone else's file.
     const session = readSessionFile(sessionFilePath(homedir()));
-    const injection = runHook(defaultStateFile(session?.sessionId, session?.participantKey));
+    if (!session?.sessionId || !session.participantKey) return;
+    const injection = runHook(defaultStateFile(session.sessionId, session.participantKey));
     if (injection) process.stdout.write(injection);
   });
 

@@ -24,16 +24,19 @@ export function pendingRiffPath(
   return join(home, '.riff', `pending-riff-${scope}.json`);
 }
 
-/** The state file, overridable via env for advanced/manual setups. */
-export function defaultStateFile(sessionId?: string, participantKey?: string): string {
-  const fromEnv = process.env.RIFF_STATE_FILE;
-  if (fromEnv) return fromEnv;
-  if (sessionId && participantKey) return pendingRiffPath(sessionId, participantKey);
-  return join(homedir(), '.riff', 'pending-riff.json');
+/**
+ * The state file for this identity, overridable via env for manual setups.
+ *
+ * The scope is required on purpose: a shared fallback path would let the hook
+ * read a different file than the plugin writes, and the failure would be
+ * silent — riffs simply never arriving.
+ */
+export function defaultStateFile(sessionId: string, participantKey: string): string {
+  return process.env.RIFF_STATE_FILE ?? pendingRiffPath(sessionId, participantKey);
 }
 
 /** Read-and-clear a pending riff and return its injection text, or '' if none. */
-export function runHook(stateFile: string = defaultStateFile()): string {
+export function runHook(stateFile: string): string {
   const capsule = readAndClearPendingRiff(stateFile);
   return capsule ? renderRiffInjection(capsule) : '';
 }
