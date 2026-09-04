@@ -1,7 +1,6 @@
 import https from 'node:https';
+import tls, { type TLSSocket } from 'node:tls';
 import { randomUUID } from 'node:crypto';
-import type { IncomingMessage } from 'node:http';
-import type { TLSSocket } from 'node:tls';
 import { WebSocket } from 'ws';
 import {
   capsuleDraftSchema,
@@ -58,6 +57,8 @@ export class RiffSessionClient implements RiffSessionClientLike {
   private readonly capsules = new Map<string, ContextCapsule>();
   private ownCapsuleId: string | undefined;
   private pendingLineage: string | undefined;
+  private connected = true;
+  private lastError: string | undefined;
 
   private constructor(
     private readonly opts: RiffSessionClientOptions,
@@ -68,6 +69,20 @@ export class RiffSessionClient implements RiffSessionClientLike {
     private readonly newId: () => string,
   ) {
     socket.on('message', (data: Buffer) => this.handleMessage(data.toString()));
+    // Permanent handlers. Without an 'error' listener a post-connect socket
+    // error (host stopped, Wi-Fi dropped) is an uncaught exception that takes
+    // the whole MCP plugin process down with it.
+    socket.on('error', (err: Error) => {
+      this.lastError = err.message;
+    });
+    socket.on('close', () => {
+      this.connected = false;
+    });
+  }
+
+  /** Whether the session socket is currently usable. */
+  get isConnected(): boolean {
+    return this.connected && this.socket.readyState === this.socket.OPEN;
   }
 
   static async connect(opts: RiffSessionClientOptions): Promise<RiffSessionClient> {
@@ -89,17 +104,14 @@ export class RiffSessionClient implements RiffSessionClientLike {
     const wsUrl = `${opts.baseUrl.replace(/^http/, 'ws')}/rooms/${opts.sessionId}?ticket=${encodeURIComponent(
       auth.ticket,
     )}`;
-    const socket = new WebSocket(wsUrl, { rejectUnauthorized: false });
-    // Pin the fingerprint on the WSS connection too, before any data flows.
-    if (opts.fingerprint) {
-      const expected = opts.fingerprint;
-      socket.on('upgrade', (res: IncomingMessage) => {
-        const peer = (res.socket as TLSSocket).getPeerCertificate?.();
-        if (!peer?.fingerprint256 || !fingerprintsMatch(peer.fingerprint256, expected)) {
-          socket.terminate();
-        }
-      });
-    }
+    // The ticket travels in the request line, so the certificate must be
+    // verified before a single byte is written. Checking on ws's 'upgrade'
+    // event is too late — by then the ticket has already been sent to whoever
+    // answered. So we complete the TLS handshake ourselves, verify the
+    // fingerprint, and only then hand the already-verified socket to ws.
+    const socket = new WebSocket(wsUrl, {
+      agent: await verifiedAgent(wsUrl, opts.fingerprint),
+    });
 
     const client = new RiffSessionClient(
       opts,
@@ -157,11 +169,15 @@ export class RiffSessionClient implements RiffSessionClientLike {
       for (const c of msg.capsules) this.capsules.set(c.id, c);
     } else if (msg.type === 'capsule:updated') {
       this.capsules.set(msg.capsule.id, msg.capsule);
+    } else if (msg.type === 'error') {
+      this.lastError = `${msg.code}: ${msg.message}`;
     } else if (msg.type === 'riff:pending') {
       // A Riff was clicked on the board (same identity). Record lineage now and
       // stage the capsule for the hook / get_pending_riff to deliver as context.
       const capsule = this.capsules.get(msg.capsuleId);
-      if (capsule) {
+      // Riffing your own capsule would set riffedFrom === id, which the schema
+      // rejects — permanently breaking every later push.
+      if (capsule && msg.capsuleId !== this.ownCapsuleId) {
         this.pendingLineage = msg.capsuleId;
         if (this.opts.stateFile) writePendingRiff(this.opts.stateFile, capsule);
       }
@@ -188,9 +204,22 @@ export class RiffSessionClient implements RiffSessionClientLike {
       createdAt: at,
       updatedAt: at,
     }) as CapsuleDraft;
+    // Clear lineage even if publishing throws below: a stuck pendingLineage
+    // would poison every later push.
     this.pendingLineage = undefined;
+    this.requireOpen();
     this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule: draft }));
     return draft;
+  }
+
+  /** ws discards sends on a closed socket, so callers must be told, not lied to. */
+  private requireOpen(): void {
+    if (!this.isConnected) {
+      throw new Error(
+        `Not connected to the Riff session${this.lastError ? ` (${this.lastError})` : ''}. ` +
+          'The host may have stopped or the network dropped.',
+      );
+    }
   }
 
   listCapsules(): ContextCapsule[] {
@@ -199,7 +228,7 @@ export class RiffSessionClient implements RiffSessionClientLike {
 
   pullCapsule(capsuleId: string): ContextCapsule | undefined {
     const capsule = this.capsules.get(capsuleId);
-    if (capsule) this.pendingLineage = capsuleId;
+    if (capsule && capsuleId !== this.ownCapsuleId) this.pendingLineage = capsuleId;
     return capsule;
   }
 
@@ -214,11 +243,12 @@ export class RiffSessionClient implements RiffSessionClientLike {
 }
 
 /** POST JSON over HTTPS, pinning the server cert fingerprint when provided. */
-function httpsPostJson(
+async function httpsPostJson(
   urlStr: string,
   body: unknown,
   fingerprint: string | undefined,
 ): Promise<AuthResponse> {
+  const agent = await verifiedAgent(urlStr, fingerprint);
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
     const data = JSON.stringify(body);
@@ -229,10 +259,7 @@ function httpsPostJson(
         path: u.pathname + u.search,
         method: 'POST',
         rejectUnauthorized: false,
-        // A fresh connection per request so `secureConnect` always fires and the
-        // fingerprint check can run before the body (join code) is sent — pooled
-        // sockets would otherwise skip verification.
-        agent: false,
+        agent,
         headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) },
       },
       (res) => {
@@ -251,18 +278,44 @@ function httpsPostJson(
         });
       },
     );
-    req.on('socket', (socket) => {
-      socket.on('secureConnect', () => {
-        if (!fingerprint) return;
-        const cert = (socket as TLSSocket).getPeerCertificate();
-        const actual = cert?.fingerprint256 ?? '';
-        if (!actual || !fingerprintsMatch(actual, fingerprint)) {
-          req.destroy(new Error('certificate fingerprint mismatch'));
-        }
-      });
-    });
     req.on('error', reject);
     req.write(data);
     req.end();
   });
+}
+
+/**
+ * Complete the TLS handshake, verify the peer certificate against the expected
+ * fingerprint, and wrap the verified socket in an agent.
+ *
+ * Riff hosts use self-signed certificates, so Node's own verification (and
+ * therefore `checkServerIdentity`) cannot be used: the chain never validates,
+ * and we hold a fingerprint rather than a CA. Verifying the connection
+ * ourselves before any request is written is what keeps the join code and the
+ * session ticket from reaching an impostor.
+ */
+async function verifiedAgent(urlStr: string, fingerprint?: string): Promise<https.Agent> {
+  const u = new URL(urlStr);
+  const port = Number(u.port || 443);
+  const socket = await new Promise<TLSSocket>((resolve, reject) => {
+    const s = tls.connect(
+      { host: u.hostname, port, servername: u.hostname, rejectUnauthorized: false },
+      () => resolve(s),
+    );
+    s.once('error', reject);
+  });
+
+  if (fingerprint) {
+    const actual = socket.getPeerCertificate()?.fingerprint256 ?? '';
+    if (!actual || !fingerprintsMatch(actual, fingerprint)) {
+      socket.destroy();
+      throw new Error('certificate fingerprint mismatch');
+    }
+  }
+
+  const agent = new https.Agent({ maxSockets: 1 });
+  // Hand over the socket we just verified, rather than letting the agent open
+  // an unverified one of its own.
+  (agent as unknown as { createConnection: () => TLSSocket }).createConnection = () => socket;
+  return agent;
 }

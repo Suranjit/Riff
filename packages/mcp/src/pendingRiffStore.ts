@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { contextCapsuleSchema, type ContextCapsule } from '@riff/shared';
 
@@ -10,8 +10,12 @@ import { contextCapsuleSchema, type ContextCapsule } from '@riff/shared';
 
 /** Write the capsule to riff on, replacing any pending one. */
 export function writePendingRiff(path: string, capsule: ContextCapsule): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(capsule), 'utf8');
+  // A pending riff is private context that gets injected into a Claude prompt.
+  // On a shared machine a world-readable file would let another local user read
+  // it — or plant one of their own.
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  writeFileSync(path, JSON.stringify(capsule), { encoding: 'utf8', mode: 0o600 });
+  chmodSync(path, 0o600); // writeFileSync's mode is subject to umask
 }
 
 /** Return the pending capsule and clear it; undefined if there is none. */
@@ -24,6 +28,11 @@ export function readAndClearPendingRiff(path: string): ContextCapsule | undefine
     return undefined;
   }
   rmSync(path, { force: true });
-  const parsed = contextCapsuleSchema.safeParse(JSON.parse(raw));
-  return parsed.success ? (parsed.data as ContextCapsule) : undefined;
+  try {
+    const parsed = contextCapsuleSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? (parsed.data as ContextCapsule) : undefined;
+  } catch {
+    // A truncated or corrupt file must not crash the prompt-submit hook.
+    return undefined;
+  }
 }

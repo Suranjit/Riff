@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { Command, InvalidArgumentError } from 'commander';
 import { buildJoinLink } from '@riff/shared';
-import { runMcpServer, runHook } from '@riff/mcp';
+import { runMcpServer, runHook, defaultStateFile } from '@riff/mcp';
 import { startSession } from './startSession.js';
 import { formatStartupBanner } from './formatStartupBanner.js';
 import { performJoin } from './join.js';
@@ -163,7 +163,9 @@ program
   .command('hook')
   .description('(internal) UserPromptSubmit hook: inject a queued riff.')
   .action(() => {
-    const injection = runHook();
+    // Derive the same per-identity path the plugin writes to.
+    const session = readSessionFile(sessionFilePath(homedir()));
+    const injection = runHook(defaultStateFile(session?.sessionId, session?.participantKey));
     if (injection) process.stdout.write(injection);
   });
 

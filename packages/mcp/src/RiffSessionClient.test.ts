@@ -117,4 +117,26 @@ describe('RiffSessionClient', () => {
     const mine = ada.pushCapsule({ objective: 'Building on Grace' });
     expect(mine.riffedFrom).toBe(target.id);
   });
+
+  it('reports a real error instead of silently dropping a push when disconnected', async () => {
+    // ws discards sends on a closed socket, so this used to report success
+    // while nothing ever reached the board.
+    const client = await connect('Ada', 'key-ada');
+    client.close();
+    await eventually(() => !client.isConnected);
+    expect(() => client.pushCapsule({ objective: 'Into the void' })).toThrow(/not connected/i);
+  });
+
+  it('never sets lineage to your own capsule, which would break every later push', async () => {
+    const client = await connect('Ada', 'key-ada');
+    const mine = client.pushCapsule({ objective: 'Mine' });
+    await eventually(() => client.listCapsules().some((c) => c.id === mine.id));
+
+    client.pullCapsule(mine.id); // riffing your own card
+    const next = client.pushCapsule({ objective: 'Still fine' });
+
+    // riffedFrom === id is rejected by the schema; if lineage had stuck, this
+    // push and every one after it would throw.
+    expect(next.riffedFrom).toBeUndefined();
+  });
 });
