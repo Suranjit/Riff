@@ -76,12 +76,33 @@ program
       return;
     }
 
-    const session = await startSession({
-      port: options.port,
-      host: options.host,
-      demo: options.demo,
-      staticDir,
-    });
+    let session;
+    try {
+      session = await startSession({
+        port: options.port,
+        host: options.host,
+        demo: options.demo,
+        staticDir,
+      });
+    } catch (err) {
+      // A port clash is the common case, and the raw EADDRINUSE gives no hint
+      // that the likely cause is a Riff session you already have running —
+      // whose join code will differ from whatever banner you are reading.
+      if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+        console.error(
+          `\n  Port ${options.port} is already in use.\n\n` +
+            '  Another Riff session is probably still running. Note that each session\n' +
+            '  has its own join code, so a stale host will reject the code you were\n' +
+            "  given by a newer one — that shows up in the browser as 'Check your join code'.\n\n" +
+            '  Either stop the other session (Ctrl-C in its terminal), or start this\n' +
+            `  one elsewhere:  riff start --port ${options.port + 1}\n`,
+        );
+      } else {
+        console.error(`\n  Could not start Riff: ${(err as Error).message}\n`);
+      }
+      process.exitCode = 1;
+      return;
+    }
 
     const joinLink = buildJoinLink({
       baseUrl: new URL(session.url).origin,
