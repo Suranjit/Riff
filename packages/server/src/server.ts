@@ -59,7 +59,7 @@ export type RiffServer = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type Connection = { socket: WebSocket; participantId: string };
+type Connection = { socket: WebSocket; participantId: string; client: 'browser' | 'agent' };
 
 /**
  * Build an authenticated, encrypted Riff host: HTTPS auth endpoint that mints
@@ -134,6 +134,41 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     return id;
   }
 
+  /** Whether this person has a Claude Code plugin connected right now. */
+  function agentConnectedFor(sessionId: string, participantId: string): boolean {
+    const room = connections.get(sessionId);
+    if (!room) return false;
+    for (const conn of room) {
+      if (
+        conn.participantId === participantId &&
+        conn.client === 'agent' &&
+        conn.socket.readyState === conn.socket.OPEN
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Tell a person's own sockets whether their agent is listening. Sent on every
+   * change so the board can say, truthfully, whether a Riff click will land.
+   */
+  function sendSelfStatus(sessionId: string, participantId: string): void {
+    const room = connections.get(sessionId);
+    if (!room) return;
+    const msg: RiffMessage = {
+      type: 'self:status',
+      agentConnected: agentConnectedFor(sessionId, participantId),
+    };
+    const wire = serializeEnvelope(msg);
+    for (const conn of room) {
+      if (conn.participantId === participantId && conn.socket.readyState === conn.socket.OPEN) {
+        conn.socket.send(wire);
+      }
+    }
+  }
+
   /** Number of open sockets in a room sharing a given participant id. */
   function socketCountFor(sessionId: string, participantId: string): number {
     const room = connections.get(sessionId);
@@ -193,7 +228,11 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
       credential?: unknown;
       name?: unknown;
       participantKey?: unknown;
+      client?: unknown;
     };
+    // Which kind of client this is. Only used to report agent presence back to
+    // the same person, so a wrong value can mislead nobody but the sender.
+    const clientKind = body.client === 'agent' ? 'agent' : 'browser';
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (name.length < 1 || name.length > 60) {
       return reply.code(400).send({ error: 'invalid_name' });
@@ -225,7 +264,14 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     }
     const participantId = resolveParticipantId(sessionId, participantKey);
     const ticket = signTicket(
-      { sid: sessionId, pid: participantId, role, name, exp: now() + limits.ticketTtlMs },
+      {
+        sid: sessionId,
+        pid: participantId,
+        role,
+        client: clientKind,
+        name,
+        exp: now() + limits.ticketTtlMs,
+      },
       opts.signingSecret,
     );
     return reply.code(200).send({ ticket, participantId, role });
@@ -289,7 +335,11 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
         throw err;
       }
 
-      const conn: Connection = { socket, participantId: participant.id };
+      const conn: Connection = {
+        socket,
+        participantId: participant.id,
+        client: claims.client ?? 'browser',
+      };
       let room = connections.get(sessionId);
       if (!room) {
         room = new Set();
@@ -299,6 +349,9 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
 
       // Snapshot to the newcomer; announce presence only on the first socket.
       send(socket, { type: 'session:snapshot', ...store.snapshot(sessionId) });
+      // Tell this person's sockets whether their agent is listening. A new
+      // socket may itself be that agent, so everyone of theirs is refreshed.
+      sendSelfStatus(sessionId, participant.id);
       if (isFirstSocket) {
         broadcast(sessionId, { type: 'participant:joined', participant }, socket);
       }
@@ -341,6 +394,9 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
         if (socketCountFor(sessionId, participant.id) === 0) {
           store.leave(sessionId, participant.id);
           broadcast(sessionId, { type: 'participant:left', participantId: participant.id });
+        } else {
+          // Their agent may have been the socket that went away.
+          sendSelfStatus(sessionId, participant.id);
         }
         if (room && room.size === 0) connections.delete(sessionId);
       });

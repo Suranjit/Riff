@@ -17,6 +17,8 @@ const ticketClaimsSchema = z.object({
   pid: z.string().min(1),
   role: z.enum(['host', 'guest']),
   name: z.string().min(1).max(60).optional(),
+  /** Which kind of client this is, so the board can report agent presence. */
+  client: z.enum(['browser', 'agent']).optional(),
   exp: z.number().int().nonnegative(),
 });
 
@@ -28,6 +30,8 @@ export type TicketClaims = {
   pid: string;
   /** Server-assigned role. */
   role: 'host' | 'guest';
+  /** Which kind of client authenticated: the board UI, or a Claude Code plugin. */
+  client?: 'browser' | 'agent';
   /** Display name captured at auth (tamper-proof inside the signed ticket). */
   name?: string;
   /** Expiry, unix ms. */

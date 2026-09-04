@@ -4,12 +4,18 @@ import type { ContextCapsule, Participant, RiffMessage } from '@riff/shared';
 export type BoardState = {
   /** The viewer's own participant id, if known. */
   self?: { participantId: string };
+  /**
+   * Whether this viewer's own Claude Code is connected. Absent means not known
+   * to be connected, which is the safe assumption: we never claim a riff landed.
+   */
+  agentConnected?: boolean;
   participants: Participant[];
   /** Capsules, newest-updated first. */
   capsules: ContextCapsule[];
 };
 
 export const initialBoardState: BoardState = {
+  agentConnected: false,
   participants: [],
   capsules: [],
 };

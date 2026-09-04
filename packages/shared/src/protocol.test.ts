@@ -47,8 +47,8 @@ const messages: RiffMessage[] = [
 ];
 
 describe('PROTOCOL_VERSION', () => {
-  it('is 3', () => {
-    expect(PROTOCOL_VERSION).toBe(3);
+  it('is 4', () => {
+    expect(PROTOCOL_VERSION).toBe(4);
   });
 });
 

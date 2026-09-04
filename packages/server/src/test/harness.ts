@@ -239,10 +239,11 @@ export async function connectClient(
   credential: string,
   name: string,
   participantKey?: string,
+  clientKind?: 'browser' | 'agent',
 ): Promise<TestClient> {
   const res = await httpsPostJson(
     h.authUrl(sessionId),
-    { credential, name, participantKey },
+    { credential, name, participantKey, client: clientKind },
     { origin: h.origin },
   );
   const { ticket } = res.body as { ticket: string };
