@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import { buildJoinLink } from '@riff/shared';
 import { runMcpServer, runHook } from '@riff/mcp';
 import { startSession } from './startSession.js';
@@ -18,15 +18,38 @@ import { resolveSessionOptions } from './resolveSession.js';
 function resolveBoardDir(): string | undefined {
   const require = createRequire(import.meta.url);
   const candidates: string[] = [];
-  // Published layout: dist/cli.js next to board/.
-  candidates.push(join(dirname(fileURLToPath(import.meta.url)), '..', 'board'));
+  // Dev: prefer the freshly built workspace board over the copied snapshot,
+  // which otherwise serves a stale UI until `copy-board` runs again.
   try {
     const pkg = require.resolve('@riff/ui/package.json');
     candidates.push(join(dirname(pkg), 'dist'));
   } catch {
     // @riff/ui not resolvable in a published install — fine.
   }
+  // Published layout: dist/cli.js next to board/.
+  candidates.push(join(dirname(fileURLToPath(import.meta.url)), '..', 'board'));
   return candidates.find((dir) => existsSync(join(dir, 'index.html')));
+}
+
+/** The package's real version, so `riff --version` and bug reports stay accurate. */
+function packageVersion(): string {
+  try {
+    const require = createRequire(import.meta.url);
+    // Same relative location in both layouts: dist/cli.js and src/cli.ts.
+    const pkg = require('../package.json') as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+/** Parse and validate a --port value; commander turns a thrown error into a clean exit. */
+function parsePort(value: string): number {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new InvalidArgumentError('Port must be an integer between 0 and 65535.');
+  }
+  return port;
 }
 
 const program = new Command();
@@ -34,13 +57,14 @@ const program = new Command();
 program
   .name('riff')
   .description('Host and join live brainstorming sessions with coding agents.')
-  .version('0.0.0');
+  .version(packageVersion());
 
 program
   .command('start')
   .description('Start a Riff session and serve the board on your network.')
-  .option('-p, --port <port>', 'port to bind', (v) => Number.parseInt(v, 10), 4747)
-  .option('-h, --host <host>', 'interface to bind', '0.0.0.0')
+  .option('-p, --port <port>', 'port to bind', parsePort, 4747)
+  // No -h short flag: it would shadow commander's built-in -h/--help.
+  .option('--host <host>', 'interface to bind', '0.0.0.0')
   .option('--demo', 'seed sample capsules so the board is not empty', false)
   .action(async (options: { port: number; host: string; demo: boolean }) => {
     const staticDir = resolveBoardDir();

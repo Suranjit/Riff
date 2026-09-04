@@ -38,3 +38,7 @@ pnpm-debug.log*
 
 # Local tool settings (keep shared settings.json, ignore per-user local)
 .claude/settings.local.json
+
+# Finder/OS duplicate copies ("file 2.ts")
+*[[:space:]]2.*
+*[[:space:]]2/
