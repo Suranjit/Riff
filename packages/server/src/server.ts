@@ -85,6 +85,13 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
   // Verified ticket claims, carried from the upgrade hook to the WS handler.
   const claimsByRequest = new WeakMap<FastifyRequest, TicketClaims>();
 
+  // Identities are per-room, so they must die with the room — but only together
+  // with it. Pruning identities while capsules survive would hand a returning
+  // person a fresh id and permanently deny them ownership of their own card.
+  store.onRoomDropped = (sessionId) => {
+    identityByKey.delete(sessionId);
+  };
+
   const app = Fastify({ https: { key: opts.tls.key, cert: opts.tls.cert } });
   // When serving the board we relax CSP so the bundled SPA loads; the API-only
   // mode keeps helmet's stricter defaults.
@@ -166,6 +173,13 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     }
 
     const ip = request.ip;
+    // Amortized sweep: a bucket back at full capacity carries no state worth
+    // keeping, and without this the map grows once per distinct client address.
+    if (authBuckets.size > 256) {
+      for (const [addr, b] of authBuckets) {
+        if (b.isFull(now())) authBuckets.delete(addr);
+      }
+    }
     let bucket = authBuckets.get(ip);
     if (!bucket) {
       bucket = new TokenBucket(limits.authAttempts.capacity, limits.authAttempts.refillPerMs);
@@ -262,7 +276,10 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
       // first socket for an identity joins presence; capacity counts identities.
       const isFirstSocket = socketCountFor(sessionId, participant.id) === 0;
       try {
-        store.join(sessionId, participant);
+        // Only the first socket registers the participant. A later socket that
+        // re-joined with a different name (or the host key) would otherwise
+        // silently rewrite name, role and joinedAt for everyone.
+        if (isFirstSocket) store.join(sessionId, participant);
       } catch (err) {
         if (err instanceof RoomFullError) {
           send(socket, { type: 'error', code: 'room_full', message: 'This session is full.' });
@@ -301,7 +318,17 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
           send(socket, { type: 'error', code, message: 'Malformed frame.' });
           return;
         }
-        handleMessage(msg);
+        try {
+          handleMessage(msg);
+        } catch {
+          // A throw here would propagate out of the ws receiver and take down
+          // the host — every room, not just this connection.
+          send(socket, {
+            type: 'error',
+            code: 'internal_error',
+            message: 'Could not process that message.',
+          });
+        }
       });
 
       socket.on('error', () => {

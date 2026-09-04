@@ -21,6 +21,8 @@ type Room = {
   capsules: Map<string, ContextCapsule>;
   /** capsule id → owning participant id (first publisher). */
   owners: Map<string, string>;
+  /** Seeded rooms (e.g. `--demo`) survive an empty participant list. */
+  pinned: boolean;
 };
 
 /** A point-in-time view of a room's participants and capsules. */
@@ -38,6 +40,9 @@ export class SessionStore {
   private readonly rooms = new Map<string, Room>();
   private readonly maxParticipants: number;
 
+  /** Called when a room is dropped, so callers can prune per-room state with it. */
+  onRoomDropped?: (sessionId: string) => void;
+
   constructor(opts: { maxParticipants?: number } = {}) {
     this.maxParticipants = opts.maxParticipants ?? 25;
   }
@@ -45,7 +50,7 @@ export class SessionStore {
   private room(sessionId: string): Room {
     let room = this.rooms.get(sessionId);
     if (!room) {
-      room = { participants: new Map(), capsules: new Map(), owners: new Map() };
+      room = { participants: new Map(), capsules: new Map(), owners: new Map(), pinned: false };
       this.rooms.set(sessionId, room);
     }
     return room;
@@ -60,13 +65,27 @@ export class SessionStore {
     room.participants.set(participant.id, participant);
   }
 
-  /** Remove a participant; drops the room if it becomes empty. */
+  /**
+   * Mark a room as pinned so it survives an empty participant list. Used by the
+   * `--demo` seed, whose capsules exist before anyone joins.
+   */
+  pinRoom(sessionId: string): void {
+    this.room(sessionId).pinned = true;
+  }
+
+  /**
+   * Remove a participant, dropping the room once the last one leaves. Capsules
+   * are never individually deleted, so without this a room that ever held one
+   * would live — with its capsules, owners and identities — for the life of the
+   * process.
+   */
   leave(sessionId: string, participantId: string): void {
     const room = this.rooms.get(sessionId);
     if (!room) return;
     room.participants.delete(participantId);
-    if (room.participants.size === 0 && room.capsules.size === 0) {
+    if (room.participants.size === 0 && !room.pinned) {
       this.rooms.delete(sessionId);
+      this.onRoomDropped?.(sessionId);
     }
   }
 
@@ -78,18 +97,25 @@ export class SessionStore {
    * @throws if the capsule fails `contextCapsuleSchema`.
    * @throws {OwnershipError} if `ownerId` differs from the recorded owner.
    */
-  upsertCapsule(sessionId: string, capsule: ContextCapsule, ownerId?: string): ContextCapsule {
+  upsertCapsule(sessionId: string, capsule: ContextCapsule, ownerId: string): ContextCapsule {
     const valid = contextCapsuleSchema.parse(capsule) as ContextCapsule;
     const room = this.room(sessionId);
 
-    if (ownerId !== undefined) {
-      const existingOwner = room.owners.get(valid.id);
-      if (existingOwner !== undefined && existingOwner !== ownerId) {
-        throw new OwnershipError(valid.id);
-      }
-      room.owners.set(valid.id, ownerId);
+    const existingOwner = room.owners.get(valid.id);
+    if (existingOwner !== undefined && existingOwner !== ownerId) {
+      throw new OwnershipError(valid.id);
     }
+    room.owners.set(valid.id, ownerId);
 
+    const existing = room.capsules.get(valid.id);
+    if (existing) {
+      // A person may hold several sockets; a queued older edit arriving after a
+      // newer one must not regress the board.
+      if (valid.updatedAt < existing.updatedAt) return existing;
+      // createdAt belongs to the original publish, not to whatever a later
+      // client happens to send.
+      valid.createdAt = existing.createdAt;
+    }
     room.capsules.set(valid.id, valid);
     return valid;
   }

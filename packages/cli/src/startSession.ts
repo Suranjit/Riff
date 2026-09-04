@@ -82,6 +82,9 @@ export async function startSession(opts: StartSessionOptions = {}): Promise<Runn
   const { port } = await server.listen(opts.port ?? 4747);
 
   if (opts.demo) {
+    // Seeded capsules exist before anyone joins, so the room must survive an
+    // empty participant list or the demo board empties on the first departure.
+    server.store.pinRoom(config.sessionId);
     for (const capsule of demoCapsules(config.sessionId, (opts.now ?? Date.now)())) {
       server.store.upsertCapsule(config.sessionId, capsule, capsule.authorId);
     }

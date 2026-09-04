@@ -153,4 +153,23 @@ describe('startSession', () => {
     });
     expect(session.server.store.snapshot(session.sessionId).capsules).toEqual([]);
   });
+
+  it('keeps demo capsules after a participant joins and leaves', async () => {
+    session = await startSession({
+      port: 0,
+      host: '127.0.0.1',
+      lanAddress: '127.0.0.1',
+      staticDir: dir,
+      demo: true,
+      deps: deterministicDeps,
+    });
+    const sid = session.sessionId;
+    const store = session.server.store;
+    const before = store.snapshot(sid).capsules.length;
+
+    store.join(sid, { id: 'p1', name: 'Ada', role: 'guest', joinedAt: 1 });
+    store.leave(sid, 'p1');
+
+    expect(store.snapshot(sid).capsules).toHaveLength(before);
+  });
 });
