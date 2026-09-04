@@ -12,6 +12,8 @@ _Turn a room full of people each talking to their own Claude into a single, shar
 
 [Introduction](#introduction) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Connect Claude Code](#connect-claude-code) · [Architecture](#architecture) · [Security](#security) · [Contributing](#contributing)
 
+**[Read the write-up: Breaking Context Silos →](https://highorderbits.io/blog/breaking-context-silos/)**
+
 </div>
 
 ---
@@ -34,6 +36,10 @@ manual handoff. The board tracks the lineage as the group's thinking evolves.
 
 Riff is **local-first**: one person runs `riff start`, everyone else opens a URL on
 the same network. No accounts, no cloud, no data leaving the room.
+
+> 📝 The thinking behind Riff — why agent context ends up siloed, and what it takes
+> to share it — is written up in
+> **[Breaking Context Silos](https://highorderbits.io/blog/breaking-context-silos/)**.
 
 ### What works today
 

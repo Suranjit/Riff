@@ -41,8 +41,8 @@ Restart Claude Code once. That's it — your agent can now publish capsules and 
 
 ## Learn more
 
-Full docs, architecture, security model, and the Claude Code setup guide:
-<https://github.com/Suranjit/Riff>
+- **Why Riff exists** — [Breaking Context Silos](https://highorderbits.io/blog/breaking-context-silos/)
+- **Docs, architecture, and security model** — <https://github.com/Suranjit/Riff>
 
 ## License
 
