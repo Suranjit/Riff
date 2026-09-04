@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { buildJoinLink } from '@riff/shared';
 import { performJoin } from './join.js';
 import { localLauncher } from './launcher.js';
@@ -69,5 +69,14 @@ describe('performJoin', () => {
 
   it('throws on a malformed link', () => {
     expect(() => performJoin({ link: 'https://host/nowhere', homeDir: home })).toThrow();
+  });
+
+  it('leaves the session file untouched when the Claude config is malformed', () => {
+    writeFileSync(join(home, '.claude.json'), '{ BROKEN', 'utf8');
+    expect(() =>
+      performJoin({ link: buildJoinLink({ ...BASE, name: 'Ada' }), homeDir: home }),
+    ).toThrow(/malformed/i);
+    // A half-applied join is worse than none: nothing may have been written.
+    expect(readSessionFile(sessionFilePath(home))).toBeUndefined();
   });
 });

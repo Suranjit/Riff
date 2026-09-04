@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -131,5 +131,23 @@ describe('ensureClaudeConfig', () => {
     };
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     expect(JSON.stringify(settings)).not.toContain('npx');
+  });
+
+  it('refuses to touch a malformed config rather than replacing it', () => {
+    // readJson used to swallow parse errors and return {}, so a momentarily
+    // corrupt ~/.claude.json was silently rewritten with only Riff's entry —
+    // destroying every other MCP server and setting the user had.
+    const path = join(home, '.claude.json');
+    const original = '{ "mcpServers": { "other": { "command": "x" } },,, BROKEN';
+    writeFileSync(path, original, 'utf8');
+
+    expect(() => ensureClaudeConfig(home)).toThrow(/could not be read|malformed/i);
+    expect(readFileSync(path, 'utf8')).toBe(original); // untouched
+  });
+
+  it('writes config files with owner-only permissions', () => {
+    ensureClaudeConfig(home);
+    const mode = statSync(join(home, '.claude.json')).mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 });

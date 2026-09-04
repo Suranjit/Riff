@@ -10,9 +10,11 @@ export const JOIN_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
  */
 export function generateJoinCode(bytes: Buffer): string {
   let out = '';
-  // 8 symbols of 5 bits each = 40 bits; take one alphabet symbol per byte.
+  // One random byte per symbol. Cycling a shorter buffer (as this used to) made
+  // the last three symbols repeat the first three: a visible pattern, and 25
+  // bits of entropy rather than the intended 40.
   for (let i = 0; i < 8; i++) {
-    const byte = bytes[i % bytes.length] ?? 0;
+    const byte = bytes[i] ?? 0;
     out += JOIN_CODE_ALPHABET[byte % JOIN_CODE_ALPHABET.length];
   }
   return `RIFF-${out.slice(0, 4)}-${out.slice(4, 8)}`;
