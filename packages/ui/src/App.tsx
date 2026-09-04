@@ -4,6 +4,7 @@ import { authenticate, AuthError } from './net/authenticate.js';
 import { RiffClient, type ConnectionState } from './net/RiffClient.js';
 import { initialBoardState, type BoardState } from './state/boardReducer.js';
 import { resolveParticipantKey } from './net/participantKey.js';
+import { clearIdentity, loadIdentity, saveIdentity } from './net/sessionIdentity.js';
 import { Board } from './components/Board.js';
 import { ConnectionPill } from './components/ConnectionPill.js';
 import { ConnectPanel } from './components/ConnectPanel.js';
@@ -34,6 +35,9 @@ export function App(): JSX.Element {
   const [riffNotice, setRiffNotice] = useState<string>();
   const [identity, setIdentity] = useState<{ name: string; code: string }>();
   const [fingerprint, setFingerprint] = useState<string>();
+  // Start in "restoring" only when there is something to restore, so a first-time
+  // visitor sees the join form immediately rather than a flash of spinner.
+  const [restoring, setRestoring] = useState(() => loadIdentity(sessionId) !== undefined);
 
   useEffect(() => {
     if (!client) return;
@@ -63,32 +67,63 @@ export function App(): JSX.Element {
     };
   }, [client, baseUrl]);
 
-  async function handleJoin({ name, code }: { name: string; code: string }): Promise<void> {
+  /**
+   * Join, and keep the credentials so a refresh does not land back on the form.
+   * The client re-authenticates for every (re)connection, since tickets are
+   * short-lived and the host may restart mid-session.
+   */
+  // Restore the previous join on mount. The host may have restarted with a new
+  // code since, so a failure drops cleanly back to the form instead of retrying.
+  useEffect(() => {
+    const saved = loadIdentity(sessionId);
+    if (!saved) return;
+    let live = true;
+    void (async () => {
+      try {
+        await join(saved);
+      } catch {
+        clearIdentity(sessionId);
+        if (live) setError('That session has ended or the code changed. Please join again.');
+      } finally {
+        if (live) setRestoring(false);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // Empty deps on purpose: restoring a saved session is a mount-time concern,
+    // not something that should re-run when credentials change.
+  }, []);
+
+  async function join({ name, code }: { name: string; code: string }): Promise<void> {
+    // Prove the credentials once before showing the board...
+    await authenticate({ baseUrl, sessionId, credential: code, name, participantKey });
+    setIdentity({ name, code });
+    saveIdentity(sessionId, { name, code });
+    setClient(
+      new RiffClient({
+        connect: async () => {
+          const { ticket, participantId } = await authenticate({
+            baseUrl,
+            sessionId,
+            credential: code,
+            name,
+            participantKey,
+          });
+          return {
+            url: `${baseUrl.replace(/^http/, 'ws')}/rooms/${sessionId}?ticket=${encodeURIComponent(ticket)}`,
+            participantId,
+          };
+        },
+      }),
+    );
+  }
+
+  async function handleJoin(credentials: { name: string; code: string }): Promise<void> {
     setBusy(true);
     setError(undefined);
     try {
-      // Prove the credentials once before showing the board...
-      await authenticate({ baseUrl, sessionId, credential: code, name, participantKey });
-      setIdentity({ name, code });
-      // ...then let the client re-authenticate for every (re)connection, since
-      // tickets are short-lived and the host may restart mid-session.
-      setClient(
-        new RiffClient({
-          connect: async () => {
-            const { ticket, participantId } = await authenticate({
-              baseUrl,
-              sessionId,
-              credential: code,
-              name,
-              participantKey,
-            });
-            return {
-              url: `${baseUrl.replace(/^http/, 'ws')}/rooms/${sessionId}?ticket=${encodeURIComponent(ticket)}`,
-              participantId,
-            };
-          },
-        }),
-      );
+      await join(credentials);
     } catch (err) {
       setError(err instanceof AuthError ? err.message : 'Could not join the session.');
     } finally {
@@ -108,6 +143,15 @@ export function App(): JSX.Element {
   }
 
   if (!client) {
+    // Suppress the form while a saved session is being restored, so a refresh
+    // does not flash the login screen at someone already signed in.
+    if (restoring) {
+      return (
+        <div className="flex min-h-screen items-center justify-center text-sm text-ink-faint">
+          Reconnecting to your session…
+        </div>
+      );
+    }
     return <JoinForm onSubmit={handleJoin} error={error} busy={busy} />;
   }
 
