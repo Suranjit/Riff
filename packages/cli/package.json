@@ -1,6 +1,6 @@
 {
   "name": "riffboard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Real-time collaborative brainstorming with coding agents. Host a shared board and riff on each other's Claude Code sessions.",
   "license": "MIT",
   "author": "Suranjit Adhikari and Riff contributors",
