@@ -32,7 +32,11 @@ describe('authenticate', () => {
     );
     const call = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     const init = (call?.[1] ?? {}) as RequestInit;
-    expect(JSON.parse(init.body as string)).toEqual({ credential: 'RIFF-CODE', name: 'Ada' });
+    expect(JSON.parse(init.body as string)).toEqual({
+      credential: 'RIFF-CODE',
+      name: 'Ada',
+      client: 'browser',
+    });
   });
 
   it('includes the participantKey in the body when provided', async () => {
@@ -50,6 +54,7 @@ describe('authenticate', () => {
     expect(JSON.parse(init.body as string)).toEqual({
       credential: 'RIFF-CODE',
       name: 'Ada',
+      client: 'browser',
       participantKey: 'key-ada',
     });
   });

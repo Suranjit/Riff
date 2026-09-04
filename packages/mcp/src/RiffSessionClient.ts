@@ -165,7 +165,7 @@ export class RiffSessionClient implements RiffSessionClientLike {
 
     const auth = await httpsPostJson(
       `${opts.baseUrl}/rooms/${opts.sessionId}/auth`,
-      { credential: opts.joinCode, name: opts.name, participantKey },
+      { credential: opts.joinCode, name: opts.name, participantKey, client: 'agent' },
       opts.fingerprint,
     );
 
@@ -401,6 +401,7 @@ async function openSession(opts: RiffSessionClientOptions): Promise<WebSocket> {
       credential: opts.joinCode,
       name: opts.name,
       participantKey: opts.participantKey,
+      client: 'agent',
     },
     opts.fingerprint,
   );

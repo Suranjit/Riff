@@ -39,6 +39,8 @@ export async function authenticate(opts: AuthenticateOptions): Promise<AuthResul
     body: JSON.stringify({
       credential: opts.credential,
       name: opts.name,
+      // Lets the server tell us whether this person's Claude Code is listening.
+      client: 'browser',
       ...(opts.participantKey ? { participantKey: opts.participantKey } : {}),
     }),
   });

@@ -10,6 +10,7 @@ import { ConnectionPill } from './components/ConnectionPill.js';
 import { ConnectPanel } from './components/ConnectPanel.js';
 import { JoinForm } from './components/JoinForm.js';
 import { buildConnectCommand } from './lib/connectCommand.js';
+import { riffNoticeFor } from './lib/riffNotice.js';
 
 /** Read the session id from a `/room/:id` path. */
 function sessionIdFromLocation(): string {
@@ -132,14 +133,17 @@ export function App(): JSX.Element {
   }
 
   function handleRiff(capsule: ContextCapsule): void {
-    // Don't claim success if the frame never left: say so instead.
+    // Never claim a riff landed: report what actually happened, including the
+    // common case where this person has no Claude Code listening.
     const sent = client?.riff(capsule.id) ?? false;
     setRiffNotice(
-      sent
-        ? `Riffing on ${capsule.author}'s capsule — continue in your Claude Code.`
-        : 'Not connected — reconnecting. Try that riff again in a moment.',
+      riffNoticeFor({
+        author: capsule.author,
+        sent,
+        agentConnected: state.agentConnected === true,
+      }),
     );
-    window.setTimeout(() => setRiffNotice(undefined), 6000);
+    window.setTimeout(() => setRiffNotice(undefined), 7000);
   }
 
   if (!client) {
@@ -182,6 +186,22 @@ export function App(): JSX.Element {
             ) : null}
           </div>
           <div className="flex items-center gap-3">
+            <span
+              className="hidden items-center gap-1.5 text-xs text-ink-faint sm:inline-flex"
+              title={
+                state.agentConnected
+                  ? 'Your Claude Code is connected — Riff will reach it.'
+                  : 'No Claude Code connected for you. Riffing will have nowhere to go.'
+              }
+            >
+              <span
+                aria-hidden
+                className={`h-1.5 w-1.5 rounded-full ${
+                  state.agentConnected ? 'bg-emerald-500' : 'bg-stone-300'
+                }`}
+              />
+              Claude Code {state.agentConnected ? 'connected' : 'not connected'}
+            </span>
             {connectCommand ? <ConnectPanel command={connectCommand} /> : null}
             <ConnectionPill state={connection} />
           </div>

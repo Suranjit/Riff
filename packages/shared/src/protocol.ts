@@ -3,7 +3,7 @@ import { capsuleDraftSchema, contextCapsuleSchema, participantSchema } from './c
 import type { CapsuleDraft, ContextCapsule, Participant } from './capsule.js';
 
 /** Wire protocol version. Bumped on any breaking change to message shapes. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /**
  * Every message exchanged between the Riff server and its clients (the board UI
@@ -19,6 +19,8 @@ export type RiffMessage =
   | { type: 'participant:joined'; participant: Participant }
   | { type: 'participant:left'; participantId: string }
   | { type: 'riff:pending'; capsuleId: string; fromParticipantId: string }
+  // Private to one participant: is this person's own Claude Code connected?
+  | { type: 'self:status'; agentConnected: boolean }
   | { type: 'error'; code: string; message: string };
 
 /** The versioned wrapper every message travels inside on the wire. */
@@ -54,6 +56,7 @@ export const riffMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('capsule:updated'), capsule: contextCapsuleSchema }),
   z.object({ type: z.literal('participant:joined'), participant: participantSchema }),
   z.object({ type: z.literal('participant:left'), participantId: z.string().uuid() }),
+  z.object({ type: z.literal('self:status'), agentConnected: z.boolean() }),
   z.object({
     type: z.literal('riff:pending'),
     capsuleId: z.string().uuid(),
