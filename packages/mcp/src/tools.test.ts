@@ -97,3 +97,22 @@ describe('get_pending_riff', () => {
     expect(res.content[0]?.text).toMatch(/no pending riffs/i);
   });
 });
+
+describe('push_capsule input bounds', () => {
+  it('reports an over-long objective as a tool error, not a raw exception', () => {
+    const client = fakeClient();
+    const res = createTools(client).push_capsule({ objective: 'x'.repeat(501) });
+    expect(res.isError).toBe(true);
+    expect(client.pushCapsule).not.toHaveBeenCalled();
+  });
+
+  it('rejects more findings than a capsule can hold', () => {
+    const client = fakeClient();
+    const res = createTools(client).push_capsule({
+      objective: 'Fine',
+      keyFindings: Array.from({ length: 21 }, (_, i) => `f${i}`),
+    });
+    expect(res.isError).toBe(true);
+    expect(client.pushCapsule).not.toHaveBeenCalled();
+  });
+});
