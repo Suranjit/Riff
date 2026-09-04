@@ -10,8 +10,10 @@ export type ContextCapsule = {
   id: string;
   /** The room / session this capsule belongs to. */
   sessionId: string;
-  /** Participant display name (1–60 chars). */
+  /** Participant display name, stamped by the server from signed ticket claims. */
   author: string;
+  /** Authenticated participant id of the author, stamped by the server. */
+  authorId: string;
   /** What this participant is trying to solve (1–500 chars). */
   objective: string;
   /** The angle being taken (0–500 chars). */
@@ -30,6 +32,12 @@ export type ContextCapsule = {
   updatedAt: number;
 };
 
+/**
+ * What a client publishes: a capsule without attribution. The server supplies
+ * `author`/`authorId` from the authenticated ticket.
+ */
+export type CapsuleDraft = Omit<ContextCapsule, 'author' | 'authorId'>;
+
 /** A connected participant in a Riff session. */
 export type Participant = {
   id: string;
@@ -43,6 +51,7 @@ export type CreateCapsuleInput = {
   id: string;
   sessionId: string;
   author: string;
+  authorId: string;
   objective: string;
   approach?: string;
   keyFindings?: string[];
@@ -73,33 +82,56 @@ export const participantSchema = z
   })
   .strip();
 
-export const contextCapsuleSchema = z
-  .object({
-    id: z.string().uuid(),
-    sessionId: z.string().uuid(),
-    author: boundedText(60),
-    objective: boundedText(500),
-    // `approach` is optional prose: may be empty, but still bounded.
-    approach: z
-      .string()
-      .transform((s) => s.trim())
-      .pipe(z.string().max(500)),
-    keyFindings: boundedList(20, 500),
-    openQuestions: boundedList(20, 500),
-    riffedFrom: z.string().uuid().optional(),
-    pushMode: z.enum(['auto', 'manual']),
-    createdAt: z.number().int().nonnegative(),
-    updatedAt: z.number().int().nonnegative(),
-  })
-  .strip()
-  .refine((c) => c.updatedAt >= c.createdAt, {
-    message: 'updatedAt must be greater than or equal to createdAt',
-    path: ['updatedAt'],
-  })
-  .refine((c) => c.riffedFrom !== c.id, {
-    message: 'a capsule cannot riff on itself (riffedFrom must differ from id)',
-    path: ['riffedFrom'],
-  });
+/**
+ * The fields a capsule carries, minus attribution. Attribution is deliberately
+ * separate: a client publishes a *draft*, and the server stamps `author` and
+ * `authorId` from its own signed ticket claims. Because the wire type has no
+ * attribution fields at all, publishing a capsule as someone else is not
+ * something the server has to reject — it is not expressible.
+ */
+const capsuleFields = {
+  id: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  objective: boundedText(500),
+  // `approach` is optional prose: may be empty, but still bounded.
+  approach: z
+    .string()
+    .transform((s) => s.trim())
+    .pipe(z.string().max(500)),
+  keyFindings: boundedList(20, 500),
+  openQuestions: boundedList(20, 500),
+  riffedFrom: z.string().uuid().optional(),
+  pushMode: z.enum(['auto', 'manual']),
+  createdAt: z.number().int().nonnegative(),
+  updatedAt: z.number().int().nonnegative(),
+};
+
+/** Shared invariants, applied to both the draft and the stored capsule. */
+function withCapsuleRules<T extends z.ZodTypeAny>(schema: T) {
+  return schema
+    .refine((c: { updatedAt: number; createdAt: number }) => c.updatedAt >= c.createdAt, {
+      message: 'updatedAt must be greater than or equal to createdAt',
+      path: ['updatedAt'],
+    })
+    .refine((c: { riffedFrom?: string; id: string }) => c.riffedFrom !== c.id, {
+      message: 'a capsule cannot riff on itself (riffedFrom must differ from id)',
+      path: ['riffedFrom'],
+    });
+}
+
+/** What a client sends to publish: everything except who wrote it. */
+export const capsuleDraftSchema = withCapsuleRules(z.object(capsuleFields).strip());
+
+/** What the server stores and broadcasts: a draft plus server-stamped attribution. */
+export const contextCapsuleSchema = withCapsuleRules(
+  z
+    .object({
+      ...capsuleFields,
+      author: boundedText(60),
+      authorId: z.string().uuid(),
+    })
+    .strip(),
+);
 
 /**
  * Build a validated {@link ContextCapsule}, filling defaults (timestamps from
@@ -112,6 +144,7 @@ export function createCapsule(input: CreateCapsuleInput): ContextCapsule {
     id: input.id,
     sessionId: input.sessionId,
     author: input.author,
+    authorId: input.authorId,
     objective: input.objective,
     approach: input.approach ?? '',
     keyFindings: input.keyFindings ?? [],

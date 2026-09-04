@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   contextCapsuleSchema,
+  type CapsuleDraft,
   parseEnvelope,
   PROTOCOL_VERSION,
   ProtocolError,
@@ -14,6 +15,7 @@ const capsule: ContextCapsule = {
   id: '11111111-1111-4111-8111-111111111111',
   sessionId: '22222222-2222-4222-8222-222222222222',
   author: 'Ada',
+  authorId: '55555555-5555-4555-8555-555555555555',
   objective: 'Design the protocol',
   approach: '',
   keyFindings: [],
@@ -30,8 +32,12 @@ const participant: Participant = {
   joinedAt: 1_000,
 };
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+const { author: _a, authorId: _b, ...draftFields } = capsule;
+const draft: CapsuleDraft = draftFields;
+
 const messages: RiffMessage[] = [
-  { type: 'capsule:publish', capsule },
+  { type: 'capsule:publish', capsule: draft },
   { type: 'riff:request', fromParticipantId: participant.id, targetCapsuleId: capsule.id },
   { type: 'session:snapshot', participants: [participant], capsules: [capsule] },
   { type: 'capsule:updated', capsule },
@@ -42,8 +48,8 @@ const messages: RiffMessage[] = [
 ];
 
 describe('PROTOCOL_VERSION', () => {
-  it('is 2', () => {
-    expect(PROTOCOL_VERSION).toBe(2);
+  it('is 3', () => {
+    expect(PROTOCOL_VERSION).toBe(3);
   });
 });
 

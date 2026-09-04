@@ -57,6 +57,8 @@ export type RiffServer = {
   store: SessionStore;
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type Connection = { socket: WebSocket; participantId: string };
 
 /**
@@ -82,6 +84,13 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
   const identityByKey = new Map<string, Map<string, string>>();
   // Verified ticket claims, carried from the upgrade hook to the WS handler.
   const claimsByRequest = new WeakMap<FastifyRequest, TicketClaims>();
+
+  // Identities are per-room, so they must die with the room — but only together
+  // with it. Pruning identities while capsules survive would hand a returning
+  // person a fresh id and permanently deny them ownership of their own card.
+  store.onRoomDropped = (sessionId) => {
+    identityByKey.delete(sessionId);
+  };
 
   const app = Fastify({ https: { key: opts.tls.key, cert: opts.tls.cert } });
   // When serving the board we relax CSP so the bundled SPA loads; the API-only
@@ -164,6 +173,13 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     }
 
     const ip = request.ip;
+    // Amortized sweep: a bucket back at full capacity carries no state worth
+    // keeping, and without this the map grows once per distinct client address.
+    if (authBuckets.size > 256) {
+      for (const [addr, b] of authBuckets) {
+        if (b.isFull(now())) authBuckets.delete(addr);
+      }
+    }
     let bucket = authBuckets.get(ip);
     if (!bucket) {
       bucket = new TokenBucket(limits.authAttempts.capacity, limits.authAttempts.refillPerMs);
@@ -192,10 +208,21 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     }
 
     const { sessionId } = request.params as { sessionId: string };
+    if (!UUID_PATTERN.test(sessionId)) {
+      return reply.code(400).send({ error: 'invalid_session' });
+    }
     // A participantKey maps to a stable id so the same person is one participant
     // across devices; without a key each auth is a fresh identity.
-    const participantKey =
-      typeof body.participantKey === 'string' ? body.participantKey : undefined;
+    let participantKey: string | undefined;
+    if (body.participantKey !== undefined) {
+      if (typeof body.participantKey !== 'string') {
+        return reply.code(400).send({ error: 'invalid_participant_key' });
+      }
+      participantKey = body.participantKey.trim();
+      if (participantKey.length < 1 || participantKey.length > 128) {
+        return reply.code(400).send({ error: 'invalid_participant_key' });
+      }
+    }
     const participantId = resolveParticipantId(sessionId, participantKey);
     const ticket = signTicket(
       { sid: sessionId, pid: participantId, role, name, exp: now() + limits.ticketTtlMs },
@@ -249,7 +276,10 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
       // first socket for an identity joins presence; capacity counts identities.
       const isFirstSocket = socketCountFor(sessionId, participant.id) === 0;
       try {
-        store.join(sessionId, participant);
+        // Only the first socket registers the participant. A later socket that
+        // re-joined with a different name (or the host key) would otherwise
+        // silently rewrite name, role and joinedAt for everyone.
+        if (isFirstSocket) store.join(sessionId, participant);
       } catch (err) {
         if (err instanceof RoomFullError) {
           send(socket, { type: 'error', code: 'room_full', message: 'This session is full.' });
@@ -288,7 +318,17 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
           send(socket, { type: 'error', code, message: 'Malformed frame.' });
           return;
         }
-        handleMessage(msg);
+        try {
+          handleMessage(msg);
+        } catch {
+          // A throw here would propagate out of the ws receiver and take down
+          // the host — every room, not just this connection.
+          send(socket, {
+            type: 'error',
+            code: 'internal_error',
+            message: 'Could not process that message.',
+          });
+        }
       });
 
       socket.on('error', () => {
@@ -316,9 +356,17 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
               });
               return;
             }
+            // Attribution comes from the authenticated ticket, never the client.
+            // The wire type carries no author fields, so this is the only place
+            // a capsule can acquire one.
+            const attributed = {
+              ...msg.capsule,
+              author: participant.name,
+              authorId: participant.id,
+            };
             let stored;
             try {
-              stored = store.upsertCapsule(sessionId, msg.capsule, participant.id);
+              stored = store.upsertCapsule(sessionId, attributed, participant.id);
             } catch (err) {
               const code = err instanceof OwnershipError ? 'forbidden' : 'invalid_capsule';
               send(socket, { type: 'error', code, message: 'Capsule rejected.' });

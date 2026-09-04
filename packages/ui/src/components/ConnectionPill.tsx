@@ -7,6 +7,7 @@ export type ConnectionPillProps = {
 const APPEARANCE: Record<ConnectionState, { label: string; dot: string; text: string }> = {
   open: { label: 'Live', dot: 'bg-emerald-500', text: 'text-emerald-700' },
   connecting: { label: 'Connecting…', dot: 'bg-amber-400', text: 'text-amber-700' },
+  reconnecting: { label: 'Reconnecting…', dot: 'bg-amber-400', text: 'text-amber-700' },
   closed: { label: 'Disconnected', dot: 'bg-stone-400', text: 'text-stone-500' },
   error: { label: 'Disconnected', dot: 'bg-red-400', text: 'text-red-600' },
 };

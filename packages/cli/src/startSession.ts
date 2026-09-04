@@ -43,6 +43,7 @@ function demoCapsules(sessionId: string, base: number): ContextCapsule[] {
     id: randomUUID(),
     sessionId,
     author: 'Ada',
+    authorId: randomUUID(),
     objective: 'Should capsule sync use CRDTs or last-writer-wins?',
     approach: 'Compare Yjs against a plain reducer for one-owner capsules.',
     keyFindings: ['Each capsule has a single owner, so conflicts are rare.'],
@@ -54,6 +55,7 @@ function demoCapsules(sessionId: string, base: number): ContextCapsule[] {
     id: randomUUID(),
     sessionId,
     author: 'Grace',
+    authorId: randomUUID(),
     objective: 'How do participants join securely on a LAN?',
     approach: 'Join code over HTTPS that mints a short-lived signed ticket.',
     keyFindings: ['Self-signed cert needs an out-of-band fingerprint check.'],
@@ -80,8 +82,11 @@ export async function startSession(opts: StartSessionOptions = {}): Promise<Runn
   const { port } = await server.listen(opts.port ?? 4747);
 
   if (opts.demo) {
+    // Seeded capsules exist before anyone joins, so the room must survive an
+    // empty participant list or the demo board empties on the first departure.
+    server.store.pinRoom(config.sessionId);
     for (const capsule of demoCapsules(config.sessionId, (opts.now ?? Date.now)())) {
-      server.store.upsertCapsule(config.sessionId, capsule);
+      server.store.upsertCapsule(config.sessionId, capsule, capsule.authorId);
     }
   }
 

@@ -18,6 +18,13 @@ export class TokenBucket {
     this.tokens = capacity;
   }
 
+  /** Whether the bucket has fully refilled, i.e. holds no state worth keeping. */
+  isFull(now: number): boolean {
+    if (this.lastRefill === undefined) return true;
+    const elapsed = Math.max(0, now - this.lastRefill);
+    return Math.min(this.capacity, this.tokens + elapsed * this.refillPerMs) >= this.capacity;
+  }
+
   /**
    * Attempt to remove `count` tokens at time `now` (unix ms), refilling based on
    * elapsed time since the last call. Returns true if the tokens were available.

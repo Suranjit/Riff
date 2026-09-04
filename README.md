@@ -7,10 +7,10 @@
 _Turn a room full of people each talking to their own Claude into a single, shared jam session._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Built test-first](https://img.shields.io/badge/built-test--first-blue.svg)](./CONTRIBUTING.md)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+[![npm](https://img.shields.io/badge/npm-riffboard-cb3837.svg)](https://www.npmjs.com/package/riffboard)
+[![Node](https://img.shields.io/badge/node-%E2%89%A522-5fa04e.svg)](https://nodejs.org)
 
-[Introduction](#introduction) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Connect Claude Code](#connect-claude-code) · [Architecture](#architecture) · [Security](#security) · [Roadmap](#roadmap) · [Contributing](#contributing)
+[Introduction](#introduction) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Connect Claude Code](#connect-claude-code) · [Architecture](#architecture) · [Security](#security) · [Contributing](#contributing)
 
 </div>
 
@@ -26,11 +26,11 @@ One person ends up driving while the rest watch. The collective intelligence in 
 room goes to waste.
 
 **Riff fixes that.** It gives the room a shared board. Each participant's Claude
-Code session publishes a compact **Context Capsule** — a live summary of what they're
-exploring, what they've found, and what's still open. Everyone sees everyone's capsules
-update in real time. When you spot a thread worth building on, you **Riff** on it:
-that person's context lands in _your_ Claude Code session — no copy-paste, no manual
-handoff. The board tracks the lineage as the group's thinking evolves.
+Code session publishes a compact **Context Capsule** — a summary of what they're
+exploring, what they've found, and what's still open. Everyone sees everyone's
+capsules update in real time. When you spot a thread worth building on, you **Riff**
+on it: that person's context lands in _your_ Claude Code session — no copy-paste, no
+manual handoff. The board tracks the lineage as the group's thinking evolves.
 
 Riff is **local-first**: one person runs `riff start`, everyone else opens a URL on
 the same network. No accounts, no cloud, no data leaving the room.
@@ -39,10 +39,12 @@ the same network. No accounts, no cloud, no data leaving the room.
 
 - 🎯 **Live shared board** — every participant's capsule, updating in real time.
 - 🧠 **Claude Code native** — capsules publish and flow through an MCP plugin.
+- ✋ **Publish on request** — your capsule goes up only when you ask. Riff never
+  publishes on its own.
 - 🖱️ **One-click riffing** — click Riff in the browser; the context auto-injects
-  into your next Claude Code message via a hook. Lineage (“riffed from Ada”) is tracked.
+  into your next Claude Code message via a hook. Lineage is tracked.
 - 🔐 **Secure by default** — TLS with fingerprint verification, join-code auth,
-  server-signed identity, rate limiting, and a [documented threat model](./docs/security/threat-model.md).
+  server-signed identity, and rate limiting.
 - 🪢 **One identity per person** — your browser and your Claude Code count as a
   single participant.
 
@@ -66,15 +68,16 @@ the same network. No accounts, no cloud, no data leaving the room.
 1. **Host** runs `riff start` — it prints a join URL, a join code, and the TLS
    certificate fingerprint.
 2. **Participants** open the URL, verify the fingerprint, and enter the join code.
-3. Each person connects Claude Code via the **Riff MCP plugin**; capsules publish
-   automatically (or on demand with `push_capsule`).
-4. The **board** shows every thread live — who's exploring what, findings, open questions.
+3. Each person connects Claude Code via the **Riff MCP plugin**, then publishes a
+   capsule whenever they want to share where they've got to.
+4. The **board** shows every thread live — who's exploring what, findings, open
+   questions.
 5. Click **Riff** on any card: that context is queued for your Claude Code and
    auto-injected on your next message.
 
 ### The Context Capsule
 
-The unit of sharing in Riff — a compact, structured snapshot of one person's thinking:
+The unit of sharing in Riff — a structured snapshot of one person's thinking:
 
 | Field | Description |
 | --- | --- |
@@ -94,11 +97,7 @@ The unit of sharing in Riff — a compact, structured snapshot of one person's t
 npx riffboard start          # add --demo to seed sample capsules
 ```
 
-**Everyone else** opens the printed URL, verifies the fingerprint, and joins with
-the code. To connect Claude Code, they click **Connect Claude Code** on the board
-and paste the one command it copies — see [below](#connect-claude-code).
-
-The host sees:
+You'll see:
 
 ```
   🎸 Riff session ready
@@ -107,73 +106,117 @@ The host sees:
   → Join code:             RIFF-4F9K-2A7Q
   → Verify fingerprint:    sha256:3f9a…
 
-  Share the join code with the room. Everyone opens the URL, checks the
-  fingerprint matches in their browser, and joins. Press Ctrl-C to stop.
+  → Claude Code (one command):
+    npx riffboard join "https://192.168.1.20:4747/room/<sessionId>#c=…&fp=…"
 ```
 
-Everyone on the network opens the URL, accepts the certificate **after checking
-the fingerprint**, and joins with the code.
+**Everyone else** opens the URL on the same Wi-Fi, accepts the certificate **after
+checking the fingerprint matches**, and joins with the code.
 
 ## Connect Claude Code
 
-On the board, click **Connect Claude Code** and paste the copied command:
+Connecting your agent takes **one command, once**.
+
+On the board, click **Connect Claude Code** and paste what it copies:
 
 ```bash
 npx riffboard join "https://…/room/<id>#c=…&fp=…&me=…&name=…"
 ```
 
-It saves the session and registers the Riff MCP server + hooks in your Claude Code
-config — **once**. Restart Claude Code the first time; every later session is just
-another paste. Full details (including manual setup) are in
-**[docs/claude-code-setup.md](./docs/claude-code-setup.md)**.
+That command saves the session to `~/.riff/session.json` and registers the Riff MCP
+server plus a `UserPromptSubmit` hook in your Claude Code config — **once**. Restart
+Claude Code the first time; every later session is just another paste.
 
-Tools the plugin exposes: `push_capsule` · `list_capsules` · `pull_capsule` · `get_pending_riff`.
+Because the copied command embeds your personal key, your browser and your Claude
+Code count as **one participant**.
+
+**What you get**
+
+- **Tools:** `push_capsule`, `list_capsules`, `pull_capsule`, `get_pending_riff`.
+- **Publish on request:** ask your Claude to push (e.g. *"push my context to the
+  board"*) and your card appears. Nothing is published automatically.
+- **Riff button → your session:** click Riff on the board, then just keep typing in
+  Claude Code — the hook injects that capsule's context before your next message.
+
+**Options**
+
+- `riff start [--port <p>] [--host <h>] [--demo]` — host a session and serve the board.
+- `riff join <link> [--name <n>] [--local]` — connect Claude Code. `--local`
+  registers a source checkout instead of the published package.
+
+**Manual setup (advanced).** Instead of `riff join`, you can configure the MCP server
+yourself and pass the session via `RIFF_URL`, `RIFF_SESSION`, `RIFF_JOIN_CODE`,
+`RIFF_NAME`, `RIFF_FINGERPRINT`, and optionally `RIFF_PARTICIPANT_KEY`. Environment
+variables take precedence over `~/.riff/session.json`. `RIFF_FINGERPRINT` pins the
+host certificate; the plugin refuses to connect without it unless `RIFF_INSECURE=1`.
 
 ## Architecture
 
-A [pnpm](https://pnpm.io) monorepo of small, single-purpose packages — 231 tests,
-written before the code they specify:
+A [pnpm](https://pnpm.io) monorepo of small, single-purpose packages. Only
+`riffboard` (in `packages/cli`) is published; it bundles the rest.
 
 ```
-riff/
-├── packages/
-│   ├── shared/   # Context Capsule schema + versioned wire protocol (zod)
-│   ├── server/   # local host: TLS, join-code auth, signed tickets, WSS sync
-│   ├── ui/       # the board (React + Vite + Tailwind)
-│   ├── mcp/      # Claude Code plugin: tools + the riff-inject hook
-│   └── cli/      # the `riffboard` package: start / join / mcp / hooks
-├── docs/
-│   ├── tickets/          # every feature's design doc (ticket-first workflow)
-│   ├── security/         # threat model
-│   └── claude-code-setup.md
-└── .github/      # issue & PR templates, CI
+Riff/
+└── packages/
+    ├── shared/   # Context Capsule schema + versioned wire protocol (zod)
+    ├── server/   # local host: TLS, join-code auth, signed tickets, WSS sync
+    ├── ui/       # the board (React + Vite + Tailwind)
+    ├── mcp/      # Claude Code plugin: tools + the riff-inject hook
+    └── cli/      # the `riffboard` package: start / join / mcp / hook
+```
+
+**Deliberate design choices:** in-memory session state (nothing is persisted),
+same-network only (no relay, no cloud), and a single source of truth for all wire
+types in `@riff/shared`.
+
+### Developing from a source checkout
+
+```bash
+git clone https://github.com/Suranjit/Riff.git
+cd Riff
+corepack enable pnpm
+pnpm install
+pnpm build                              # build the board + bundle the CLI
+
+pnpm test && pnpm typecheck && pnpm lint
+
+node packages/cli/dist/cli.js start --demo              # host from your checkout
+node packages/cli/dist/cli.js join --local "<link>"     # register this build
 ```
 
 ## Security
 
-Same-network is not the same as trusted. Riff ships with:
+A LAN is not a trusted space, so Riff does not treat it as one:
 
-- **TLS everywhere** — self-signed cert with an out-of-band **SHA-256 fingerprint**
-  check (the MCP plugin pins it and fails closed).
-- **Join-code authentication** over HTTPS minting short-lived, HMAC-signed tickets;
-  identity and role are **server-assigned**, never client-claimed.
-- **A hardened socket** — payload caps, per-connection rate limiting, origin
-  allow-list, per-room capacity, schema validation on every frame.
+- **TLS everywhere.** `riff start` generates a self-signed certificate and prints its
+  **SHA-256 fingerprint**. Verify it out-of-band; the MCP plugin pins it and refuses
+  to connect without it.
+- **Join-code authentication** over HTTPS, minting short-lived HMAC-signed tickets.
+  Participant identity, role, and capsule attribution are **assigned by the server**
+  from those signed tickets — a client cannot publish as someone else.
+- **A hardened socket** — payload caps, per-connection rate limiting, an origin
+  allow-list, per-room capacity, and schema validation on every frame.
 
-Details and limitations: [threat model](./docs/security/threat-model.md) ·
-[security policy](./SECURITY.md).
+**Known limitations.** Riff is built for trusted, same-network groups. Session state
+is in memory and there is no end-to-end encryption beyond TLS, so the host process
+sees session content. Do not expose a Riff host to the public internet.
+
+**Reporting a vulnerability.** Please report security issues privately to
+**suranjit.adhikari@gmail.com** rather than opening a public issue.
 
 ## Contributing
 
-Contributions are welcome!
+Contributions are welcome.
 
-1. **Open an issue** to report a bug or propose a feature — use the
-   [issue templates](./.github/ISSUE_TEMPLATE) so there's a place to discuss it first.
+1. **Open an issue** describing the bug or the feature, so we can align first.
 2. **Fork and branch** off `main`.
-3. **Make your change** and run the checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`.
-4. **Open a pull request** against `main` referencing the issue; the
-   [PR template](./.github/PULL_REQUEST_TEMPLATE.md) walks you through the rest.
+3. **Make your change**, adding or updating tests for anything that changes behavior.
+4. **Run the checks:** `pnpm test && pnpm typecheck && pnpm lint`
+5. **Open a pull request** against `main`, referencing the issue.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup details, and please be kind —
-we follow a [Code of Conduct](./CODE_OF_CONDUCT.md).
+By contributing you agree that your contributions are licensed under the project's
+[MIT License](./LICENSE).
 
+## License
+
+[MIT](./LICENSE) © 2026 Suranjit Adhikari and Riff contributors

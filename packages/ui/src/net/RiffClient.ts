@@ -1,7 +1,7 @@
-import { parseEnvelope, serializeEnvelope, type ContextCapsule } from '@riff/shared';
+import { createBackoff, parseEnvelope, serializeEnvelope, type BackoffOptions } from '@riff/shared';
 import { boardReducer, initialBoardState, type BoardState } from '../state/boardReducer.js';
 
-export type ConnectionState = 'connecting' | 'open' | 'closed' | 'error';
+export type ConnectionState = 'connecting' | 'open' | 'reconnecting' | 'closed' | 'error';
 
 /** The minimal WebSocket surface RiffClient needs (injectable for tests). */
 export interface WebSocketLike {
@@ -14,11 +14,17 @@ export interface WebSocketLike {
 }
 
 export type RiffClientOptions = {
-  url: string;
-  /** The viewer's own participant id (from authentication). */
-  self: { participantId: string };
+  /**
+   * Re-authenticate and return a fresh socket URL. Called for every attempt,
+   * including reconnects: tickets are short-lived, so a cached URL would stop
+   * working exactly when it is needed most.
+   */
+  connect: () => Promise<{ url: string; participantId: string }>;
   /** Factory for the underlying socket (defaults to the browser `WebSocket`). */
   socketFactory?: (url: string) => WebSocketLike;
+  /** Schedule a retry (injectable so tests need no real timers). */
+  schedule?: (fn: () => void, ms: number) => () => void;
+  backoff?: BackoffOptions;
 };
 
 /**
@@ -28,22 +34,62 @@ export type RiffClientOptions = {
 export class RiffClient {
   state: BoardState = initialBoardState;
 
-  private readonly socket: WebSocketLike;
-  private readonly self: { participantId: string };
+  private socket: WebSocketLike | undefined;
   private readonly stateListeners = new Set<(state: BoardState) => void>();
   private readonly connectionListeners = new Set<(state: ConnectionState) => void>();
   private connection: ConnectionState = 'connecting';
+  private readonly backoff;
+  private readonly factory: (url: string) => WebSocketLike;
+  private readonly schedule: (fn: () => void, ms: number) => () => void;
+  private cancelRetry: (() => void) | undefined;
+  private closedByUser = false;
 
-  constructor(opts: RiffClientOptions) {
-    this.self = opts.self;
-    this.state = { ...initialBoardState, self: opts.self };
-    const factory = opts.socketFactory ?? ((url) => new WebSocket(url) as WebSocketLike);
-    this.socket = factory(opts.url);
+  constructor(private readonly opts: RiffClientOptions) {
+    this.factory = opts.socketFactory ?? ((url) => new WebSocket(url) as WebSocketLike);
+    this.schedule =
+      opts.schedule ??
+      ((fn, ms) => {
+        const id = window.setTimeout(fn, ms);
+        return () => window.clearTimeout(id);
+      });
+    this.backoff = createBackoff(opts.backoff);
+    void this.open();
+  }
 
-    this.socket.onopen = () => this.setConnection('open');
-    this.socket.onclose = () => this.setConnection('closed');
-    this.socket.onerror = () => this.setConnection('error');
-    this.socket.onmessage = (event) => this.handleData(event.data);
+  /** Authenticate, open a socket, and wire it up. Retries on failure. */
+  private async open(): Promise<void> {
+    if (this.closedByUser) return;
+    try {
+      const { url, participantId } = await this.opts.connect();
+      if (this.closedByUser) return;
+      // Re-authentication can yield a different participant id (the host may
+      // have restarted). Without this, the board would stop recognising which
+      // capsules are yours after a reconnect.
+      this.state = { ...this.state, self: { participantId } };
+      const socket = this.factory(url);
+      this.socket = socket;
+
+      socket.onopen = () => {
+        this.backoff.reset();
+        this.setConnection('open');
+      };
+      socket.onclose = () => this.retry();
+      socket.onerror = () => this.retry();
+      socket.onmessage = (event) => this.handleData(event.data);
+    } catch {
+      this.retry();
+    }
+  }
+
+  /** Schedule another attempt, unless the caller closed us deliberately. */
+  private retry(): void {
+    if (this.closedByUser || this.cancelRetry) return;
+    this.socket = undefined;
+    this.setConnection('reconnecting');
+    this.cancelRetry = this.schedule(() => {
+      this.cancelRetry = undefined;
+      void this.open();
+    }, this.backoff.next());
   }
 
   private handleData(data: unknown): void {
@@ -80,23 +126,26 @@ export class RiffClient {
     return () => this.connectionListeners.delete(listener);
   }
 
-  /** Publish (or update) the viewer's own capsule. */
-  publish(capsule: ContextCapsule): void {
-    this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule }));
-  }
-
   /** Request to riff on another participant's capsule. */
-  riff(targetCapsuleId: string): void {
+  riff(targetCapsuleId: string): boolean {
+    const self = this.state.self;
+    if (!this.socket || this.connection !== 'open' || !self) return false;
     this.socket.send(
       serializeEnvelope({
         type: 'riff:request',
-        fromParticipantId: this.self.participantId,
+        fromParticipantId: self.participantId,
         targetCapsuleId,
       }),
     );
+    return true;
   }
 
   close(): void {
-    this.socket.close();
+    // A deliberate close must not be resurrected by the reconnect loop.
+    this.closedByUser = true;
+    this.cancelRetry?.();
+    this.cancelRetry = undefined;
+    this.socket?.close();
+    this.setConnection('closed');
   }
 }

@@ -15,11 +15,14 @@ export type ToolHandlers = {
   get_pending_riff(): ToolResponse;
 };
 
+// Mirrors the capsule schema's bounds. Without this, an over-long objective
+// passed validation here and then threw a raw ZodError out of the client, which
+// Claude sees as an opaque failure instead of "objective is too long".
 export const pushArgsSchema = z.object({
-  objective: z.string().trim().min(1),
-  approach: z.string().optional(),
-  keyFindings: z.array(z.string()).optional(),
-  openQuestions: z.array(z.string()).optional(),
+  objective: z.string().trim().min(1).max(500),
+  approach: z.string().max(500).optional(),
+  keyFindings: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
+  openQuestions: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
 });
 
 export const pullArgsSchema = z.object({ capsuleId: z.string().min(1) });
@@ -49,8 +52,8 @@ export function createTools(client: RiffSessionClientLike): ToolHandlers {
       if (!parsed.success) {
         return text(`Invalid capsule: ${parsed.error.issues[0]?.message ?? 'bad input'}`, true);
       }
-      const capsule = client.pushCapsule(parsed.data);
-      return text(`Published your capsule (${capsule.id}).`);
+      const draft = client.pushCapsule(parsed.data);
+      return text(`Published your capsule (${draft.id}).`);
     },
 
     list_capsules() {

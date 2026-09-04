@@ -11,6 +11,7 @@ function validCapsule(overrides: Partial<ContextCapsule> = {}): ContextCapsule {
     id: ID,
     sessionId: SESSION_ID,
     author: 'Ada',
+    authorId: '55555555-5555-4555-8555-555555555555',
     objective: 'Design the capsule schema',
     approach: 'Start from the wire contract',
     keyFindings: ['zod gives us schema-as-source-of-truth'],

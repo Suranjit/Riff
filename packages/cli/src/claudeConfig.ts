@@ -5,7 +5,17 @@
  * read `~/.riff/session.json`, so they never need editing again. The launcher
  * (npx vs. local) is pluggable so the flow can be validated before publishing.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { hookCommand, npxLauncher, type Launcher } from './launcher.js';
 
@@ -21,19 +31,72 @@ const STALE_AUTOPUSH_MARKER = '#riff-autopush';
 type JsonObject = Record<string, unknown>;
 type HookEntry = { hooks: Array<{ type: string; command: string }> };
 
+/**
+ * Read an existing config, refusing to continue if it is present but
+ * unparseable. Treating a corrupt file as `{}` (the previous behaviour) meant a
+ * momentarily malformed ~/.claude.json got rewritten with only Riff's entry,
+ * silently destroying every other MCP server and setting the user had.
+ */
 function readJson(path: string): JsonObject {
   if (!existsSync(path)) return {};
+  let raw: string;
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as JsonObject;
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
-  } catch {
-    return {};
+    raw = readFileSync(path, 'utf8');
+  } catch (err) {
+    throw new Error(`${path} could not be read: ${(err as Error).message}`);
+  }
+  if (raw.trim() === '') return {};
+  try {
+    const parsed = JSON.parse(raw) as JsonObject;
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error('not a JSON object');
+    }
+    return parsed;
+  } catch (err) {
+    throw new Error(
+      `${path} is malformed (${(err as Error).message}). ` +
+        'Riff will not overwrite it — please fix or move the file, then retry.',
+    );
   }
 }
 
+/**
+ * Write atomically: a partial write here would corrupt the user's Claude Code
+ * configuration. Rename within the same directory so it cannot cross devices,
+ * and resolve symlinks so a dotfiles-managed config keeps its link.
+ */
 function writeJson(path: string, value: JsonObject): void {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  let target = path;
+  try {
+    if (statSync(path, { throwIfNoEntry: false })?.isFile()) {
+      target = realpathSync(path);
+    }
+  } catch {
+    /* fall back to the literal path */
+  }
+  const tmp = `${target}.riff-${process.pid}.tmp`;
+  try {
+    writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, target);
+  } catch (err) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      /* nothing to clean up */
+    }
+    throw err;
+  }
+}
+
+/**
+ * Read both Claude config files without writing, so a caller can fail before
+ * touching anything. Throws if either exists but cannot be parsed.
+ */
+export function validateClaudeConfig(homeDir: string): void {
+  readJson(join(homeDir, '.claude.json'));
+  readJson(join(homeDir, '.claude', 'settings.json'));
 }
 
 /** Whether any hook entry carries our marker. */

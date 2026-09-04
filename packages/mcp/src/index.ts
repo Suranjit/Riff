@@ -10,4 +10,4 @@ export { createMcpServer } from './server.js';
 export { runMcpServer } from './runServer.js';
 export { normalizeFingerprint, fingerprintsMatch } from './fingerprint.js';
 export { writePendingRiff, readAndClearPendingRiff } from './pendingRiffStore.js';
-export { renderRiffInjection, runHook, defaultStateFile } from './hook.js';
+export { renderRiffInjection, runHook, defaultStateFile, pendingRiffPath } from './hook.js';

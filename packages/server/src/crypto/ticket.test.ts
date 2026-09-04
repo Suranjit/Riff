@@ -77,3 +77,35 @@ describe('signTicket / verifyTicket', () => {
     }
   });
 });
+
+describe('claims validation (a ticket is only trustworthy if its claims are)', () => {
+  it('rejects a ticket with no exp instead of treating it as eternal', () => {
+    const token = signTicket(
+      { sid: 's', pid: 'p', role: 'guest' } as unknown as TicketClaims,
+      SECRET,
+    );
+    expect(() => verifyTicket(token, SECRET, { now: Date.now() })).toThrow(TicketError);
+  });
+
+  it('rejects claims whose types are wrong', () => {
+    const token = signTicket(
+      {
+        sid: 's',
+        pid: { evil: 1 },
+        role: 'admin',
+        name: 123,
+        exp: 9_999_999_999_999,
+      } as unknown as TicketClaims,
+      SECRET,
+    );
+    expect(() => verifyTicket(token, SECRET, { now: 1_000 })).toThrow(TicketError);
+  });
+
+  it('rejects an unknown role', () => {
+    const token = signTicket(
+      { sid: 's', pid: 'p', role: 'superuser', exp: 9_999_999_999_999 } as unknown as TicketClaims,
+      SECRET,
+    );
+    expect(() => verifyTicket(token, SECRET, { now: 1_000 })).toThrow(TicketError);
+  });
+});

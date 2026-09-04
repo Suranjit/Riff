@@ -67,16 +67,28 @@ export function App(): JSX.Element {
     setBusy(true);
     setError(undefined);
     try {
-      const { ticket, participantId } = await authenticate({
-        baseUrl,
-        sessionId,
-        credential: code,
-        name,
-        participantKey,
-      });
-      const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/rooms/${sessionId}?ticket=${encodeURIComponent(ticket)}`;
+      // Prove the credentials once before showing the board...
+      await authenticate({ baseUrl, sessionId, credential: code, name, participantKey });
       setIdentity({ name, code });
-      setClient(new RiffClient({ url: wsUrl, self: { participantId } }));
+      // ...then let the client re-authenticate for every (re)connection, since
+      // tickets are short-lived and the host may restart mid-session.
+      setClient(
+        new RiffClient({
+          connect: async () => {
+            const { ticket, participantId } = await authenticate({
+              baseUrl,
+              sessionId,
+              credential: code,
+              name,
+              participantKey,
+            });
+            return {
+              url: `${baseUrl.replace(/^http/, 'ws')}/rooms/${sessionId}?ticket=${encodeURIComponent(ticket)}`,
+              participantId,
+            };
+          },
+        }),
+      );
     } catch (err) {
       setError(err instanceof AuthError ? err.message : 'Could not join the session.');
     } finally {
@@ -85,8 +97,13 @@ export function App(): JSX.Element {
   }
 
   function handleRiff(capsule: ContextCapsule): void {
-    client?.riff(capsule.id);
-    setRiffNotice(`Riffing on ${capsule.author}'s capsule — continue in your Claude Code.`);
+    // Don't claim success if the frame never left: say so instead.
+    const sent = client?.riff(capsule.id) ?? false;
+    setRiffNotice(
+      sent
+        ? `Riffing on ${capsule.author}'s capsule — continue in your Claude Code.`
+        : 'Not connected — reconnecting. Try that riff again in a moment.',
+    );
     window.setTimeout(() => setRiffNotice(undefined), 6000);
   }
 

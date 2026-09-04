@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ContextCapsule, RiffMessage } from '@riff/shared';
+import { PROTOCOL_VERSION, type CapsuleDraft, type RiffMessage } from '@riff/shared';
 import type { WebSocket } from 'ws';
 import { signTicket } from './crypto/ticket.js';
 import {
@@ -21,11 +21,12 @@ const isType =
   (m: RiffMessage): boolean =>
     m.type === type;
 
-function capsule(overrides: Partial<ContextCapsule> = {}): ContextCapsule {
+const OTHER_PARTICIPANT_ID = '66666666-6666-4666-8666-666666666666';
+
+function capsule(overrides: Partial<CapsuleDraft> = {}): CapsuleDraft {
   return {
     id: '33333333-3333-4333-8333-333333333333',
     sessionId: SESSION,
-    author: 'Ada',
     objective: 'Explore the graph model',
     approach: '',
     keyFindings: [],
@@ -99,10 +100,10 @@ describe('WSS session endpoint', () => {
     const ada = await connect('Ada');
     const grace = await connect('Grace');
 
-    ada.send({ type: 'capsule:publish', capsule: capsule({ author: 'Ada' }) });
+    ada.send({ type: 'capsule:publish', capsule: capsule() });
     await grace.next(isType('capsule:updated'));
 
-    grace.send({ type: 'capsule:publish', capsule: capsule({ author: 'Grace' }) });
+    grace.send({ type: 'capsule:publish', capsule: capsule() });
     const msg = (await grace.next(isType('error'))) as Extract<RiffMessage, { type: 'error' }>;
     expect(msg.code).toBeTypeOf('string');
   });
@@ -173,5 +174,46 @@ describe('WSS session endpoint', () => {
     const msg = (await grace.next(isType('error'))) as Extract<RiffMessage, { type: 'error' }>;
     expect(msg.code).toBe('room_full');
     await expect(waitClose(grace.socket)).resolves.toBeDefined();
+  });
+
+  it('attributes a capsule to the authenticated publisher, not to a claimed name', async () => {
+    // Regression for the verified impersonation exploit: Mallory authenticates
+    // honestly and publishes; the board must show "Mallory", never someone else.
+    const mallory = await connect('Mallory');
+    const observer = await connect('Ada');
+
+    mallory.send({ type: 'capsule:publish', capsule: capsule() });
+
+    const msg = (await observer.next(isType('capsule:updated'))) as Extract<
+      RiffMessage,
+      { type: 'capsule:updated' }
+    >;
+    expect(msg.capsule.author).toBe('Mallory');
+    expect(msg.capsule.authorId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+  });
+
+  it('ignores attribution fields smuggled into a publish frame', async () => {
+    const mallory = await connect('Mallory');
+    const observer = await connect('Ada');
+
+    // Send a raw frame carrying author/authorId; the draft schema strips them.
+    mallory.socket.send(
+      JSON.stringify({
+        v: PROTOCOL_VERSION,
+        msg: {
+          type: 'capsule:publish',
+          capsule: { ...capsule(), author: 'Ada', authorId: OTHER_PARTICIPANT_ID },
+        },
+      }),
+    );
+
+    const msg = (await observer.next(isType('capsule:updated'))) as Extract<
+      RiffMessage,
+      { type: 'capsule:updated' }
+    >;
+    expect(msg.capsule.author).toBe('Mallory');
+    expect(msg.capsule.authorId).not.toBe(OTHER_PARTICIPANT_ID);
   });
 });

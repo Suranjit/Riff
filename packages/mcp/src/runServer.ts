@@ -9,7 +9,7 @@ import { defaultStateFile } from './hook.js';
  */
 export async function runMcpServer(options: RiffSessionClientOptions): Promise<void> {
   const client = await RiffSessionClient.connect({
-    stateFile: defaultStateFile(),
+    stateFile: defaultStateFile(options.sessionId, options.participantKey),
     ...options,
   });
 

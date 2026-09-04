@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { parseJoinLink } from '@riff/shared';
-import { ensureClaudeConfig, type EnsureResult } from './claudeConfig.js';
+import { ensureClaudeConfig, validateClaudeConfig, type EnsureResult } from './claudeConfig.js';
 import { npxLauncher, type Launcher } from './launcher.js';
 import { sessionFilePath, writeSessionFile } from './sessionFile.js';
 
@@ -38,6 +38,10 @@ export function performJoin(opts: JoinOptions): JoinResult {
 
   const participantKey = link.participantKey ?? generateKey();
   const name = opts.name ?? link.name ?? osUsername();
+
+  // Pre-flight: surface a malformed Claude config before touching anything, so
+  // a refusal leaves the machine exactly as it was rather than half-joined.
+  validateClaudeConfig(opts.homeDir);
 
   writeSessionFile(sessionFilePath(opts.homeDir), {
     baseUrl: link.baseUrl,

@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { contextCapsuleSchema, participantSchema } from './capsule.js';
-import type { ContextCapsule, Participant } from './capsule.js';
+import { capsuleDraftSchema, contextCapsuleSchema, participantSchema } from './capsule.js';
+import type { CapsuleDraft, ContextCapsule, Participant } from './capsule.js';
 
 /** Wire protocol version. Bumped on any breaking change to message shapes. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /**
  * Every message exchanged between the Riff server and its clients (the board UI
@@ -11,7 +11,7 @@ export const PROTOCOL_VERSION = 2;
  */
 export type RiffMessage =
   // client → server
-  | { type: 'capsule:publish'; capsule: ContextCapsule }
+  | { type: 'capsule:publish'; capsule: CapsuleDraft }
   | { type: 'riff:request'; fromParticipantId: string; targetCapsuleId: string }
   // server → client
   | { type: 'session:snapshot'; participants: Participant[]; capsules: ContextCapsule[] }
@@ -39,7 +39,7 @@ export class ProtocolError extends Error {
 }
 
 export const riffMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('capsule:publish'), capsule: contextCapsuleSchema }),
+  z.object({ type: z.literal('capsule:publish'), capsule: capsuleDraftSchema }),
   z.object({
     type: z.literal('riff:request'),
     // Client-claimed; the server ignores it in favour of the authenticated id.

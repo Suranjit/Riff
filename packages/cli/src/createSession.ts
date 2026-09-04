@@ -26,7 +26,7 @@ export function createSession(deps: Partial<SessionDeps> = {}): SessionConfig {
 
   return {
     sessionId: randomUUID(),
-    joinCode: generateJoinCode(randomBytes(5)),
+    joinCode: generateJoinCode(randomBytes(8)),
     hostKey: randomBytes(24).toString('base64url'),
     signingSecret: randomBytes(32),
     cert: generateCert(),

@@ -10,6 +10,7 @@ function capsule(overrides: Partial<ContextCapsule> = {}): ContextCapsule {
     id: '33333333-3333-4333-8333-333333333333',
     sessionId: SESSION,
     author: 'Ada',
+    authorId: '55555555-5555-4555-8555-555555555555',
     objective: 'Explore the graph model',
     approach: '',
     keyFindings: ['finding one'],
@@ -94,5 +95,24 @@ describe('get_pending_riff', () => {
     const tools = createTools(fakeClient({ takePendingRiff: vi.fn(() => undefined) }));
     const res = tools.get_pending_riff();
     expect(res.content[0]?.text).toMatch(/no pending riffs/i);
+  });
+});
+
+describe('push_capsule input bounds', () => {
+  it('reports an over-long objective as a tool error, not a raw exception', () => {
+    const client = fakeClient();
+    const res = createTools(client).push_capsule({ objective: 'x'.repeat(501) });
+    expect(res.isError).toBe(true);
+    expect(client.pushCapsule).not.toHaveBeenCalled();
+  });
+
+  it('rejects more findings than a capsule can hold', () => {
+    const client = fakeClient();
+    const res = createTools(client).push_capsule({
+      objective: 'Fine',
+      keyFindings: Array.from({ length: 21 }, (_, i) => `f${i}`),
+    });
+    expect(res.isError).toBe(true);
+    expect(client.pushCapsule).not.toHaveBeenCalled();
   });
 });

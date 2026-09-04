@@ -117,4 +117,48 @@ describe('RiffSessionClient', () => {
     const mine = ada.pushCapsule({ objective: 'Building on Grace' });
     expect(mine.riffedFrom).toBe(target.id);
   });
+
+  it('reports a real error instead of silently dropping a push when disconnected', async () => {
+    // ws discards sends on a closed socket, so this used to report success
+    // while nothing ever reached the board.
+    const client = await connect('Ada', 'key-ada');
+    client.close();
+    await eventually(() => !client.isConnected);
+    expect(() => client.pushCapsule({ objective: 'Into the void' })).toThrow(/not connected/i);
+  });
+
+  it('never sets lineage to your own capsule, which would break every later push', async () => {
+    const client = await connect('Ada', 'key-ada');
+    const mine = client.pushCapsule({ objective: 'Mine' });
+    await eventually(() => client.listCapsules().some((c) => c.id === mine.id));
+
+    client.pullCapsule(mine.id); // riffing your own card
+    const next = client.pushCapsule({ objective: 'Still fine' });
+
+    // riffedFrom === id is rejected by the schema; if lineage had stuck, this
+    // push and every one after it would throw.
+    expect(next.riffedFrom).toBeUndefined();
+  });
+
+  it('reconnects after a dropped socket and keeps the same identity', async () => {
+    const client = await RiffSessionClient.connect({
+      baseUrl: h.baseUrl,
+      sessionId: h.sessionId,
+      joinCode: JOIN_CODE,
+      name: 'Ada',
+      participantKey: 'key-ada',
+      fingerprint: FINGERPRINT,
+      backoff: { baseMs: 5, jitter: 0 },
+    });
+    open.push(client);
+    const before = client.participantId;
+
+    // Simulate a network drop: tear down the underlying socket, host stays up.
+    (client as unknown as { socket: { terminate(): void } }).socket.terminate();
+    await eventually(() => !client.isConnected);
+
+    await eventually(() => client.isConnected, 8000);
+    expect(client.participantId).toBe(before);
+    expect(() => client.pushCapsule({ objective: 'Back online' })).not.toThrow();
+  });
 });

@@ -1,11 +1,35 @@
-import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ContextCapsule } from '@riff/shared';
 import { readAndClearPendingRiff } from './pendingRiffStore.js';
 
-/** The state file shared between the plugin and the hook (overridable via env). */
-export function defaultStateFile(): string {
-  return process.env.RIFF_STATE_FILE ?? join(tmpdir(), 'riff-pending-riff.json');
+/**
+ * Where the plugin and the prompt-submit hook exchange a pending riff.
+ *
+ * Scoped per session+participant so two Claude Code windows cannot consume each
+ * other's queued context, and kept under the user's home rather than a shared
+ * temp directory. The identity is hashed because the participant key is a
+ * bearer secret and must not appear in a filename.
+ */
+export function pendingRiffPath(
+  sessionId: string,
+  participantKey: string,
+  home = homedir(),
+): string {
+  const scope = createHash('sha256')
+    .update(`${sessionId}:${participantKey}`)
+    .digest('hex')
+    .slice(0, 16);
+  return join(home, '.riff', `pending-riff-${scope}.json`);
+}
+
+/** The state file, overridable via env for advanced/manual setups. */
+export function defaultStateFile(sessionId?: string, participantKey?: string): string {
+  const fromEnv = process.env.RIFF_STATE_FILE;
+  if (fromEnv) return fromEnv;
+  if (sessionId && participantKey) return pendingRiffPath(sessionId, participantKey);
+  return join(homedir(), '.riff', 'pending-riff.json');
 }
 
 /** Read-and-clear a pending riff and return its injection text, or '' if none. */
