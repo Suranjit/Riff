@@ -52,14 +52,6 @@ describe('RiffClient', () => {
     expect(states.at(-1)).toBe(1);
   });
 
-  it('sends a capsule:publish envelope on publish()', () => {
-    const { client, socket } = makeClient();
-    const c = capsule();
-    client.publish(c);
-    const msg = socket.lastMessage();
-    expect(msg).toEqual({ type: 'capsule:publish', capsule: c });
-  });
-
   it('sends a riff:request with the viewer as origin on riff()', () => {
     const { client, socket } = makeClient();
     client.riff(TARGET_CAPSULE_ID);

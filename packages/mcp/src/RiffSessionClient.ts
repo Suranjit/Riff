@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import type { TLSSocket } from 'node:tls';
 import { WebSocket } from 'ws';
-import { createCapsule, parseEnvelope, serializeEnvelope, type ContextCapsule } from '@riff/shared';
+import {
+  capsuleDraftSchema,
+  parseEnvelope,
+  serializeEnvelope,
+  type CapsuleDraft,
+  type ContextCapsule,
+} from '@riff/shared';
 import { fingerprintsMatch } from './fingerprint.js';
 import { readAndClearPendingRiff, writePendingRiff } from './pendingRiffStore.js';
 
@@ -17,7 +23,7 @@ export type PushFields = {
 
 /** The capsule operations the MCP tools depend on (fakeable in unit tests). */
 export interface RiffSessionClientLike {
-  pushCapsule(fields: PushFields): ContextCapsule;
+  pushCapsule(fields: PushFields): CapsuleDraft;
   listCapsules(): ContextCapsule[];
   pullCapsule(capsuleId: string): ContextCapsule | undefined;
   /** Read-and-clear a pending riff queued from the board's Riff button. */
@@ -166,24 +172,25 @@ export class RiffSessionClient implements RiffSessionClientLike {
     return `${this.opts.baseUrl}/room/${this.opts.sessionId}?me=${encodeURIComponent(this.participantKey)}`;
   }
 
-  pushCapsule(fields: PushFields): ContextCapsule {
+  pushCapsule(fields: PushFields): CapsuleDraft {
     if (this.ownCapsuleId === undefined) this.ownCapsuleId = this.newId();
-    const capsule = createCapsule({
+    const at = this.now();
+    // A draft carries no author: the server stamps attribution from our ticket.
+    const draft = capsuleDraftSchema.parse({
       id: this.ownCapsuleId,
       sessionId: this.opts.sessionId,
-      author: this.opts.name,
       objective: fields.objective,
-      approach: fields.approach,
-      keyFindings: fields.keyFindings,
-      openQuestions: fields.openQuestions,
+      approach: fields.approach ?? '',
+      keyFindings: fields.keyFindings ?? [],
+      openQuestions: fields.openQuestions ?? [],
       riffedFrom: this.pendingLineage,
       pushMode: 'manual',
-      now: this.now(),
-    });
+      createdAt: at,
+      updatedAt: at,
+    }) as CapsuleDraft;
     this.pendingLineage = undefined;
-    this.capsules.set(capsule.id, capsule);
-    this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule }));
-    return capsule;
+    this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule: draft }));
+    return draft;
   }
 
   listCapsules(): ContextCapsule[] {

@@ -13,10 +13,6 @@ export type BoardProps = {
 
 export function Board({ state, onRiff, nowMs }: BoardProps): JSX.Element {
   const selfId = state.self?.participantId;
-  // Capsules carry an author name, not a participant id, so we infer ownership
-  // by matching the viewer's display name. Good enough to disable Riff on your
-  // own card for the MVP.
-  const selfName = state.participants.find((p) => p.id === selfId)?.name;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 pb-16">
@@ -50,7 +46,7 @@ export function Board({ state, onRiff, nowMs }: BoardProps): JSX.Element {
               index={index}
               nowMs={nowMs}
               lineageLabel={riffedFromLabel(state, capsule)}
-              isOwn={selfName !== undefined && capsule.author === selfName}
+              isOwn={capsule.authorId === selfId}
               onRiff={onRiff}
             />
           ))}

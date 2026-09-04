@@ -1,4 +1,4 @@
-import { parseEnvelope, serializeEnvelope, type ContextCapsule } from '@riff/shared';
+import { parseEnvelope, serializeEnvelope } from '@riff/shared';
 import { boardReducer, initialBoardState, type BoardState } from '../state/boardReducer.js';
 
 export type ConnectionState = 'connecting' | 'open' | 'closed' | 'error';
@@ -78,11 +78,6 @@ export class RiffClient {
   onConnection(listener: (state: ConnectionState) => void): () => void {
     this.connectionListeners.add(listener);
     return () => this.connectionListeners.delete(listener);
-  }
-
-  /** Publish (or update) the viewer's own capsule. */
-  publish(capsule: ContextCapsule): void {
-    this.socket.send(serializeEnvelope({ type: 'capsule:publish', capsule }));
   }
 
   /** Request to riff on another participant's capsule. */

@@ -19,6 +19,7 @@ function capsule(overrides: Partial<ContextCapsule> = {}): ContextCapsule {
     id: '33333333-3333-4333-8333-333333333333',
     sessionId: SESSION,
     author: 'Ada',
+    authorId: '55555555-5555-4555-8555-555555555555',
     objective: 'Design the store',
     approach: '',
     keyFindings: [],

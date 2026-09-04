@@ -57,6 +57,8 @@ export type RiffServer = {
   store: SessionStore;
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type Connection = { socket: WebSocket; participantId: string };
 
 /**
@@ -192,10 +194,21 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
     }
 
     const { sessionId } = request.params as { sessionId: string };
+    if (!UUID_PATTERN.test(sessionId)) {
+      return reply.code(400).send({ error: 'invalid_session' });
+    }
     // A participantKey maps to a stable id so the same person is one participant
     // across devices; without a key each auth is a fresh identity.
-    const participantKey =
-      typeof body.participantKey === 'string' ? body.participantKey : undefined;
+    let participantKey: string | undefined;
+    if (body.participantKey !== undefined) {
+      if (typeof body.participantKey !== 'string') {
+        return reply.code(400).send({ error: 'invalid_participant_key' });
+      }
+      participantKey = body.participantKey.trim();
+      if (participantKey.length < 1 || participantKey.length > 128) {
+        return reply.code(400).send({ error: 'invalid_participant_key' });
+      }
+    }
     const participantId = resolveParticipantId(sessionId, participantKey);
     const ticket = signTicket(
       { sid: sessionId, pid: participantId, role, name, exp: now() + limits.ticketTtlMs },
@@ -316,9 +329,17 @@ export async function createRiffServer(opts: RiffServerOptions): Promise<RiffSer
               });
               return;
             }
+            // Attribution comes from the authenticated ticket, never the client.
+            // The wire type carries no author fields, so this is the only place
+            // a capsule can acquire one.
+            const attributed = {
+              ...msg.capsule,
+              author: participant.name,
+              authorId: participant.id,
+            };
             let stored;
             try {
-              stored = store.upsertCapsule(sessionId, msg.capsule, participant.id);
+              stored = store.upsertCapsule(sessionId, attributed, participant.id);
             } catch (err) {
               const code = err instanceof OwnershipError ? 'forbidden' : 'invalid_capsule';
               send(socket, { type: 'error', code, message: 'Capsule rejected.' });

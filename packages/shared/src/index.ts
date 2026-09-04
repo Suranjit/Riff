@@ -1,5 +1,10 @@
-export type { ContextCapsule, Participant, CreateCapsuleInput } from './capsule.js';
-export { contextCapsuleSchema, participantSchema, createCapsule } from './capsule.js';
+export type { ContextCapsule, CapsuleDraft, Participant, CreateCapsuleInput } from './capsule.js';
+export {
+  contextCapsuleSchema,
+  capsuleDraftSchema,
+  participantSchema,
+  createCapsule,
+} from './capsule.js';
 
 export type { JoinLink } from './joinLink.js';
 export { buildJoinLink, parseJoinLink, JoinLinkError } from './joinLink.js';

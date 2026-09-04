@@ -4,6 +4,21 @@
  * join code, so the socket is never the authentication surface.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { z } from 'zod';
+
+/**
+ * Claims are validated, not merely cast. A signature only proves we minted the
+ * token; it says nothing about its shape. Without this, a ticket missing `exp`
+ * compares `undefined <= now` as false and so never expires, and unchecked
+ * types flow straight into the participant record broadcast to every client.
+ */
+const ticketClaimsSchema = z.object({
+  sid: z.string().min(1),
+  pid: z.string().min(1),
+  role: z.enum(['host', 'guest']),
+  name: z.string().min(1).max(60).optional(),
+  exp: z.number().int().nonnegative(),
+});
 
 /** The claims carried by a signed ticket. */
 export type TicketClaims = {
@@ -64,12 +79,18 @@ export function verifyTicket(
     throw new TicketError('Bad ticket signature', 'bad_signature');
   }
 
-  let claims: TicketClaims;
+  let parsed: unknown;
   try {
-    claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as TicketClaims;
+    parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
   } catch {
     throw new TicketError('Malformed ticket payload', 'malformed');
   }
+
+  const result = ticketClaimsSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new TicketError('Ticket claims failed validation', 'malformed');
+  }
+  const claims: TicketClaims = result.data;
 
   if (claims.exp <= opts.now) {
     throw new TicketError('Ticket expired', 'expired');

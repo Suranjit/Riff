@@ -49,8 +49,8 @@ export function createTools(client: RiffSessionClientLike): ToolHandlers {
       if (!parsed.success) {
         return text(`Invalid capsule: ${parsed.error.issues[0]?.message ?? 'bad input'}`, true);
       }
-      const capsule = client.pushCapsule(parsed.data);
-      return text(`Published your capsule (${capsule.id}).`);
+      const draft = client.pushCapsule(parsed.data);
+      return text(`Published your capsule (${draft.id}).`);
     },
 
     list_capsules() {

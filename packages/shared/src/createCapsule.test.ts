@@ -9,6 +9,7 @@ function input(overrides: Partial<CreateCapsuleInput> = {}): CreateCapsuleInput 
     id: ID,
     sessionId: SESSION_ID,
     author: 'Ada',
+    authorId: '55555555-5555-4555-8555-555555555555',
     objective: 'Design the capsule schema',
     pushMode: 'manual',
     now: 5_000,

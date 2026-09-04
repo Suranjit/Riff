@@ -160,4 +160,42 @@ describe('shared participant identity', () => {
     const msg = (await third.next(isType('error'))) as Extract<RiffMessage, { type: 'error' }>;
     expect(msg.code).toBe('room_full');
   });
+
+  it('rejects a blank participantKey rather than collapsing identities', async () => {
+    // A present-but-empty key used to map every such client onto ONE participant:
+    // merged presence, shared capsule ownership, and cross-delivered riffs.
+    const res = await httpsPostJson(
+      h.authUrl(SESSION),
+      { credential: TEST_JOIN_CODE, name: 'Ada', participantKey: '' },
+      { origin: h.origin },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a whitespace-only participantKey', async () => {
+    const res = await httpsPostJson(
+      h.authUrl(SESSION),
+      { credential: TEST_JOIN_CODE, name: 'Ada', participantKey: '   ' },
+      { origin: h.origin },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects an oversized participantKey', async () => {
+    const res = await httpsPostJson(
+      h.authUrl(SESSION),
+      { credential: TEST_JOIN_CODE, name: 'Ada', participantKey: 'k'.repeat(200) },
+      { origin: h.origin },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-uuid sessionId, which could never hold a capsule', async () => {
+    const res = await httpsPostJson(
+      `${h.origin}/rooms/standup/auth`,
+      { credential: TEST_JOIN_CODE, name: 'Ada' },
+      { origin: h.origin },
+    );
+    expect(res.status).toBe(400);
+  });
 });
