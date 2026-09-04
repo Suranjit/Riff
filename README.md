@@ -7,7 +7,6 @@
 _Turn a room full of people each talking to their own Claude into a single, shared jam session._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Status: MVP complete](https://img.shields.io/badge/status-MVP%20complete%20·%20pre--release-blueviolet.svg)](#project-status)
 [![Built test-first](https://img.shields.io/badge/built-test--first-blue.svg)](./CONTRIBUTING.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -150,10 +149,6 @@ riff/
 └── .github/      # issue & PR templates, CI
 ```
 
-**Deliberate MVP choices:** in-memory session state (nothing persisted), same-network
-only (no relay, no cloud), and a single source of truth for all wire types in
-`@riff/shared`.
-
 ## Security
 
 Same-network is not the same as trusted. Riff ships with:
@@ -167,37 +162,6 @@ Same-network is not the same as trusted. Riff ships with:
 
 Details and limitations: [threat model](./docs/security/threat-model.md) ·
 [security policy](./SECURITY.md).
-
-## Project status
-
-> **MVP complete, pre-release.** Every core feature below is built and tested
-> (test-first, one ticket at a time — see [`docs/tickets`](./docs/tickets)), and
-> the `riffboard` package runs standalone from a packed tarball. Remaining before
-> a first release: publishing to npm, broader real-world testing, and docs
-> hardening. Expect rough edges.
-
-## Roadmap
-
-**MVP — done**
-
-- [x] `@riff/shared` — Context Capsule schema & versioned wire protocol
-- [x] `riff-server` — encrypted, authenticated host with real-time sync
-- [x] Board UI — live capsule grid, presence, connection state
-- [x] Shared identity — browser + Claude Code = one participant
-- [x] MCP plugin — publish & pull capsules from Claude Code
-- [x] Riff button → auto-inject into your Claude Code (hook)
-- [x] Explicit publish — `push_capsule` puts your capsule on the board on request
-- [x] `riff start` — one command to host, with `--demo` seeding
-- [x] One-command join — `npx riffboard join` installs the Claude Code integration
-- [x] Packaging — bundled `riffboard` package, runnable via `npx`
-
-**Next**
-
-- [ ] Publish `riffboard` to npm
-- [ ] Session recap / export when the meeting ends
-- [ ] Lineage graph view (who riffed on whom, visually)
-- [ ] Cross-network sessions (opt-in relay)
-- [ ] Additional agent adapters beyond Claude Code
 
 ## Contributing
 
@@ -213,6 +177,3 @@ Contributions are welcome!
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup details, and please be kind —
 we follow a [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-## License
-
-[MIT](./LICENSE) © 2026 Suranjit Adhikari and Riff contributors
