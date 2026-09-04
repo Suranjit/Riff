@@ -32,7 +32,6 @@ const participant: Participant = {
   joinedAt: 1_000,
 };
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
 const { author: _a, authorId: _b, ...draftFields } = capsule;
 const draft: CapsuleDraft = draftFields;
 
