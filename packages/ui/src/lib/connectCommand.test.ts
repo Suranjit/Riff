@@ -14,12 +14,12 @@ const INPUT = {
 describe('buildConnectCommand', () => {
   const command = buildConnectCommand(INPUT);
 
-  it('is an npx riffboard join command with a quoted link', () => {
-    expect(command).toMatch(/^npx riffboard join "https:\/\/.+"$/);
+  it('runs an npx riffboard join with a quoted link', () => {
+    expect(command).toMatch(/npx -y riffboard join "https:\/\/.+"/);
   });
 
   it('embeds a parseable link carrying the full session context', () => {
-    const link = command.match(/"(.+)"/)?.[1] ?? '';
+    const link = command.match(/join "([^"]+)"/)?.[1] ?? '';
     expect(parseJoinLink(link)).toEqual({
       baseUrl: INPUT.origin,
       sessionId: INPUT.sessionId,
@@ -27,6 +27,24 @@ describe('buildConnectCommand', () => {
       fingerprint: INPUT.fingerprint,
       participantKey: INPUT.participantKey,
       name: INPUT.name,
+    });
+  });
+
+  describe('when Node is missing', () => {
+    it('explains what to install instead of failing with "command not found"', () => {
+      const cmd = buildConnectCommand(INPUT);
+      expect(cmd).toContain('command -v npx');
+      expect(cmd).toContain('nodejs.org');
+      expect(cmd).toMatch(/Node\.js/i);
+    });
+
+    it('still runs the join when npx is present', () => {
+      const cmd = buildConnectCommand(INPUT);
+      expect(cmd).toMatch(/npx -y riffboard join "https:\/\//);
+    });
+
+    it('is a single line, so it pastes into a terminal as one command', () => {
+      expect(buildConnectCommand(INPUT)).not.toContain('\n');
     });
   });
 });
