@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { spawn, spawnSync } from 'node:child_process';
 import { Command, InvalidArgumentError } from 'commander';
 import { buildJoinLink } from '@riff/shared';
 import { runMcpServer, runHook, defaultStateFile } from '@riff/mcp';
@@ -13,6 +14,7 @@ import { performJoin } from './join.js';
 import { localLauncher } from './launcher.js';
 import { readSessionFile, sessionFilePath } from './sessionFile.js';
 import { resolveSessionOptions } from './resolveSession.js';
+import { planPostJoin } from './postJoin.js';
 
 /** Locate the built board assets (workspace @riff/ui in dev, bundled board/ when published). */
 function resolveBoardDir(): string | undefined {
@@ -132,7 +134,8 @@ program
   .description('Connect Claude Code to a Riff session (one-time setup, then paste per session).')
   .option('-n, --name <name>', 'your display name on the board')
   .option('--local', 'register this local build instead of npx (for testing before publishing)')
-  .action((link: string, options: { name?: string; local?: boolean }) => {
+  .option('--no-launch', 'configure only; do not start Claude Code afterwards')
+  .action((link: string, options: { name?: string; local?: boolean; launch?: boolean }) => {
     const launcher = options.local
       ? localLauncher(fileURLToPath(import.meta.url), process.execPath)
       : undefined;
@@ -144,13 +147,39 @@ program
     if (options.local) {
       console.log('  → Local mode: Claude Code will launch this build directly.');
     }
-    if (firstTime) {
-      console.log('');
-      console.log('  Claude Code integration installed. Restart Claude Code once to load it.');
-    } else {
-      console.log('  Claude Code integration updated.');
-    }
+    console.log(
+      firstTime ? '  Claude Code integration installed.' : '  Claude Code integration updated.',
+    );
     console.log('');
+
+    // Claude Code reads this config at startup, so starting it here is what
+    // makes the new MCP server and hook take effect.
+    const plan = planPostJoin({
+      hasClaude: spawnSync('which', ['claude']).status === 0,
+      isInteractive: process.stdout.isTTY === true,
+      noLaunch: options.launch === false,
+    });
+
+    if (plan.action === 'install-claude') {
+      console.log('  Claude Code is not installed — get it at ' + plan.url);
+      console.log('  Then run `claude` here and your agent will join the board.');
+      console.log('');
+      return;
+    }
+    if (plan.action === 'manual') {
+      console.log('  Start (or restart) Claude Code to load it.');
+      console.log('');
+      return;
+    }
+
+    console.log('  Starting Claude Code…');
+    console.log('');
+    const child = spawn('claude', [], { stdio: 'inherit' });
+    child.on('exit', (code) => process.exit(code ?? 0));
+    child.on('error', () => {
+      console.error('  Could not start Claude Code. Run `claude` here yourself.');
+      process.exitCode = 1;
+    });
   });
 
 /** Shared resolver for the static subcommands. */

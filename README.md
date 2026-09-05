@@ -129,9 +129,13 @@ On the board, click **Connect Claude Code** and paste what it copies:
 npx riffboard join "https://…/room/<id>#c=…&fp=…&me=…&name=…"
 ```
 
-That command saves the session to `~/.riff/session.json` and registers the Riff MCP
-server plus a `UserPromptSubmit` hook in your Claude Code config — **once**. Restart
-Claude Code the first time; every later session is just another paste.
+That command saves the session to `~/.riff/session.json`, registers the Riff MCP
+server plus a `UserPromptSubmit` hook in your Claude Code config — **once** — and
+then starts Claude Code for you, so the new configuration is loaded straight away.
+Every later session is just another paste.
+
+The copied command checks for Node first, so someone without it gets a pointer to
+the installer rather than `command not found: npx`.
 
 Because the copied command embeds your personal key, your browser and your Claude
 Code count as **one participant**.
@@ -147,8 +151,10 @@ Code count as **one participant**.
 **Options**
 
 - `riff start [--port <p>] [--host <h>] [--demo]` — host a session and serve the board.
-- `riff join <link> [--name <n>] [--local]` — connect Claude Code. `--local`
-  registers a source checkout instead of the published package.
+- `riff join <link> [--name <n>] [--local] [--no-launch]` — connect Claude Code and
+  start it. `--no-launch` configures only; `--local` registers a source checkout
+  instead of the published package. Launching is skipped automatically when the
+  command is scripted rather than run in a terminal.
 
 **Manual setup (advanced).** Instead of `riff join`, you can configure the MCP server
 yourself and pass the session via `RIFF_URL`, `RIFF_SESSION`, `RIFF_JOIN_CODE`,
